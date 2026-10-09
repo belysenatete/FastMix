@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS processing_jobs (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS jobs_queue ON processing_jobs(created_at) WHERE status = 'queued';
+CREATE UNIQUE INDEX IF NOT EXISTS jobs_one_active_per_project ON processing_jobs(project_id) WHERE status IN ('queued', 'processing');
 
 CREATE TABLE IF NOT EXISTS outputs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -57,6 +58,7 @@ CREATE TABLE IF NOT EXISTS outputs (
   size_bytes BIGINT NOT NULL CHECK (size_bytes >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS outputs_one_per_job ON outputs(job_id);
 
 CREATE TABLE IF NOT EXISTS subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

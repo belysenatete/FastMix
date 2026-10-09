@@ -4,45 +4,42 @@ Last updated: 2026-10-09
 
 ## Current status
 
-- **Build status:** Implementation started. Local-first mode is the MVP; external production providers remain explicit integrations.
-- **Current phase:** Phase 5 - Asynchronous processing pipeline.
-- **Progress:** Phase 4 complete in code: uploads pass through the authenticated Next.js server to FastAPI, which checks project ownership, file extension/signature, and the 100 MB limit before writing to private MinIO storage and saving PostgreSQL metadata.
-- **Current focus:** Add background jobs and a clearly labeled demo processor without claiming to perform AI mixing.
-- **Next task:** Implement job enqueue/status/retry APIs, a Redis-backed Python worker, and mixer progress feedback, then checkpoint Phase 5.
-- **Blockers/dependencies:** TypeScript passes and Compose config parses. Docker Desktop cannot start and Python is not on PATH, so service runtime behavior cannot be exercised here. GitHub remote is available. Credentials remain user-maintained in [credentials.md](credentials.md); do not read unless needed.
+- **Build status:** Implementation underway. Local-first MVP with explicit provider integration limits.
+- **Current phase:** Phase 6 - Playback, downloads, and library.
+- **Progress:** Phase 5 complete in code: project jobs can be queued to Redis, processed by a Python FFmpeg worker, tracked/polled, retried after failure, and downloaded from private storage using a short-lived URL.
+- **Current focus:** Make completed outputs discoverable, playable, and manageable from the library; complete session/audio deletion behavior.
+- **Next task:** Add output history and playback/download controls, status-aware library, and cascade audio deletion; then checkpoint Phase 6.
+- **Blockers/dependencies:** TypeScript passes and Compose config parses. Docker Desktop cannot start and Python is not on PATH, so runtime service behavior remains unverified. Credentials remain user-maintained in [credentials.md](credentials.md); do not read unless required.
 
 ## Phase status
-
-Status values: `Not started`, `In progress`, `Complete`, or `Blocked`.
 
 | Phase | Status | Notes |
 |---|---|---|
 | 0. Confirm scope and architecture | Complete | Documented scope and local-first MVP; production providers need credentials/configuration. |
 | 1. Repository and local development foundation | Complete | Next.js/TypeScript scaffold, Compose infrastructure, PostgreSQL schema, FastAPI service, and setup README. Pushed. |
-| 2. Public site and authentication | Complete | Local demo auth only; production OAuth/password auth needs a configured provider. Pushed. |
-| 3. Mixer workspace and project data | Complete | TypeScript check passed; PostgreSQL-backed project API plus browser preview fallback. Pushed. |
-| 4. Secure audio upload and storage | Complete | Private MinIO storage; authenticated upload/delete/list proxy; signature, size, and ownership checks. TypeScript and Compose config passed; Docker daemon unavailable for runtime validation. Pushed after this tracker update. |
-| 5. Asynchronous processing pipeline | In progress | |
-| 6. Playback, downloads, and library | Not started | |
+| 2. Public site and authentication | Complete | Local demo auth only; production auth provider remains unconfigured. Pushed. |
+| 3. Mixer workspace and project data | Complete | Studio shell, session CRUD, project APIs, and library. TypeScript check passed. Pushed. |
+| 4. Secure audio upload and storage | Complete | Private MinIO upload/list/delete track APIs with ownership, signature, and size checks. TypeScript and Compose config passed; runtime unavailable. Pushed. |
+| 5. Asynchronous processing pipeline | Complete | Redis queue, PostgreSQL job lifecycle, retry/recovery, Python FFmpeg mix/master preview, WAV output, and signed downloads. TypeScript and Compose config passed; worker runtime unavailable. Pushed after this tracker update. |
+| 6. Playback, downloads, and library | In progress | |
 | 7. Account, help, affiliate, and billing | Not started | |
 | 8. Security, accessibility, and release readiness | Not started | |
 | 9. Iterate from usage | Not started | |
 
 ## Work log
 
-- 2026-10-09: Build authorized through Phase 7; user requested a commit and push after each phase.
-- 2026-10-09: Phase 4 completed in code. Added private MinIO local storage, authenticated streaming Next.js-to-FastAPI uploads, format/signature/size checks, project ownership validation, and track list/delete operations. TypeScript passed and Compose config parsed; Docker Desktop reported it could not start, so service behavior remains runtime-unverified.
-- 2026-10-09: Phase 3 completed. Added protected studio navigation, mixer and library interfaces, browser-persisted projects, PostgreSQL project CRUD routes scoped to the demo user, and track metadata. TypeScript check passed; database execution is not yet verified.
-- 2026-10-09: Phase 2 completed. Added the public landing page, plan/FAQ/testimonial interactions, EN/FR hero copy selector, help/legal routes, and signed local demo session. TypeScript check passed; ESLint was interrupted and remains unverified.
-- 2026-10-09: Phase 1 completed. Created Next.js 16 / React 19 / TypeScript app under `web/`, PostgreSQL schema, Redis/Postgres Compose setup, FastAPI health service foundation, environment template, and setup README.
+- 2026-10-09: Build authorized through Phase 7; the user requested a commit and push at the end of each phase.
+- 2026-10-09: Phase 5 completed in code. Added queued/processing/completed/failed jobs, Redis dispatch, worker retry/recovery, FFmpeg normalization/mixing preview, output storage, and signed output download. The preview is not AI processing. TypeScript and Compose config passed; Docker Desktop and Python runtime are unavailable for execution.
+- 2026-10-09: Phase 4 completed in code. Added private MinIO storage, authenticated Next.js-to-FastAPI uploads, file signature/size checks, project ownership checks, and track list/delete operations. TypeScript passed and Compose config parsed; Docker Desktop could not start.
+- 2026-10-09: Phase 3 completed. Added protected studio navigation, mixer/library screens, browser preview projects, and PostgreSQL project CRUD routes. TypeScript check passed; database execution remains unverified.
+- 2026-10-09: Phase 2 completed. Added the public landing page, pricing/FAQ/testimonial interactions, EN/FR hero copy selection, legal/help routes, and a signed local demo session. TypeScript passed; ESLint remains unverified.
+- 2026-10-09: Phase 1 completed. Added Next.js 16 / React 19 / TypeScript app, PostgreSQL schema, Redis/Postgres Compose setup, FastAPI foundation, environment template, and README.
 - 2026-10-09: Created the roadmap, feature description, coding principles, credentials template, and tracker.
-- 2026-10-06: Inspected the Easymix public site and signed-in areas. Actual mix output was not observed because no audio was processed.
+- 2026-10-06: Inspected Easymix public and signed-in flows. Actual Easymix processing output was not observed.
 
-## Update checklist
+## Session update checklist
 
-At the beginning of a coding session, read this tracker and resume from **Current focus**. At the end of each coding session:
+At the start of a work session, read this tracker and resume from **Current focus**. At each completed phase boundary:
 
-1. Update the current phase and status.
-2. Record completed work and any verification performed.
-3. State the next concrete task and any blocker/dependency.
-4. Commit and push a checkpoint for each completed phase, as requested by the user.
+1. Update phase status, completed work, verification, blockers, and next task.
+2. Commit and push that phase checkpoint, as the user requested.

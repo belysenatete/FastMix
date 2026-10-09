@@ -7,7 +7,8 @@ export async function proxyWorker(request: Request, workerPath: string, method: 
   const internalSecret = process.env.INTERNAL_API_SECRET;
   if (!internalSecret) return NextResponse.json({ error: "The private audio service is not configured." }, { status: 503 });
 
-  if (method === "POST") {
+  const isTrackUpload = method === "POST" && workerPath.endsWith("/tracks");
+  if (isTrackUpload) {
     const contentLength = Number(request.headers.get("content-length") || "0");
     if (contentLength > 105 * 1024 * 1024) return NextResponse.json({ error: "Audio files must be 100 MB or smaller." }, { status: 413 });
     if (!request.headers.get("content-type")?.startsWith("multipart/form-data;")) {
@@ -20,14 +21,14 @@ export async function proxyWorker(request: Request, workerPath: string, method: 
     "X-User-Email": session.email,
   });
   const contentType = request.headers.get("content-type");
-  if (contentType) headers.set("Content-Type", contentType);
+  if (contentType && method === "POST") headers.set("Content-Type", contentType);
   const options: RequestInit & { duplex?: "half" } = {
     method,
     headers,
     cache: "no-store",
     signal: AbortSignal.timeout(method === "POST" ? 180_000 : 15_000),
   };
-  if (method === "POST") {
+  if (method === "POST" && request.body) {
     options.body = request.body;
     options.duplex = "half";
   }

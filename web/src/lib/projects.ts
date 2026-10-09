@@ -81,7 +81,7 @@ export function persistProject(project: ProjectRecord) {
     void fetch(`/api/projects/${encodeURIComponent(updated.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: updated.title, prompt: updated.prompt }),
+      body: JSON.stringify({ title: updated.title, prompt: updated.prompt, projectType: updated.projectType }),
     }).catch(() => undefined);
     saveTimers.delete(updated.id);
   }, 450);

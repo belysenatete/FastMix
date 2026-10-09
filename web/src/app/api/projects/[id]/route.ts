@@ -14,12 +14,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const owner = await getOwner();
   if (!owner) return NextResponse.json({ error: "Sign in and configure DATABASE_URL to update projects." }, { status: 503 });
   const { id } = await params;
-  const body = await request.json().catch(() => null) as { title?: unknown; prompt?: unknown; status?: unknown } | null;
+  const body = await request.json().catch(() => null) as { title?: unknown; prompt?: unknown; projectType?: unknown } | null;
   const title = typeof body?.title === "string" ? body.title.trim().slice(0, 120) : null;
   const prompt = typeof body?.prompt === "string" ? body.prompt.slice(0, 4000) : null;
+  const projectType = body?.projectType === "mix" || body?.projectType === "master" ? body.projectType : null;
   const [project] = await owner.sql`
     UPDATE projects SET
-      title = COALESCE(${title}, title), prompt = COALESCE(${prompt}, prompt), updated_at = now()
+      title = COALESCE(${title}, title), prompt = COALESCE(${prompt}, prompt), project_type = COALESCE(${projectType}, project_type), updated_at = now()
     WHERE id = ${id} AND user_id = ${owner.id}
     RETURNING *
   `;

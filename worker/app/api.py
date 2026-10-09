@@ -5,9 +5,11 @@ import redis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .uploads import router as uploads_router
+from .jobs import router as jobs_router
 
 app = FastAPI(title="FastMix API", version="0.1.0")
 app.include_router(uploads_router)
+app.include_router(jobs_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("WEB_ORIGIN", "http://localhost:3000").split(","),
