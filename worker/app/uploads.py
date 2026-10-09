@@ -76,6 +76,29 @@ def list_tracks(project_id: uuid.UUID, email: str = Depends(require_internal_app
     return {"tracks": rows}
 
 
+@router.delete("/{project_id}")
+def delete_project(project_id: uuid.UUID, email: str = Depends(require_internal_app)):
+    with psycopg.connect(database_url(), row_factory=dict_row) as connection:
+        find_owner(connection, email, project_id)
+        active_job = connection.execute("SELECT id FROM processing_jobs WHERE project_id = %s AND status IN ('queued', 'processing') LIMIT 1", (project_id,)).fetchone()
+        if active_job:
+            raise HTTPException(status_code=409, detail="Wait for the session job to finish before deleting this project")
+        track_keys = connection.execute("SELECT storage_key FROM tracks WHERE project_id = %s", (project_id,)).fetchall()
+        output_keys = connection.execute(
+            "SELECT o.storage_key FROM outputs o JOIN processing_jobs j ON j.id = o.job_id WHERE j.project_id = %s",
+            (project_id,),
+        ).fetchall()
+        client = storage_client() if track_keys or output_keys else None
+        if client:
+            for item in [*track_keys, *output_keys]:
+                try:
+                    client.delete_object(Bucket=os.environ["S3_BUCKET"], Key=item["storage_key"])
+                except Exception as error:
+                    raise HTTPException(status_code=503, detail="Project audio could not be fully removed. Please retry.") from error
+        connection.execute("DELETE FROM projects WHERE id = %s", (project_id,))
+    return {"ok": True}
+
+
 @router.post("/{project_id}/tracks", status_code=201)
 def upload_track(
     project_id: uuid.UUID,

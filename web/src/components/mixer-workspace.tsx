@@ -159,7 +159,8 @@ export default function MixerWorkspace() {
 
   async function deleteCurrentSession() {
     if (!project) return;
-    await removeProject(project.id);
+    const deleted = await removeProject(project.id);
+    if (!deleted) { setNotice("This session could not be removed. Wait for processing to finish and check local services."); return; }
     const remaining = await listProjects();
     const next = remaining[0] || await createProject();
     setProject(next);

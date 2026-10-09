@@ -1,6 +1,6 @@
 export type TrackCategory = "beat" | "lead_vocal" | "doubles" | "backing_vocals" | "adlibs" | "instrument" | "master";
 export type TrackRecord = { id: string; name: string; category: TrackCategory; mimeType: string; sizeBytes: number; lastModified: number };
-export type ProjectRecord = { id: string; title: string; prompt: string; projectType: "mix" | "master"; status: string; createdAt: string; updatedAt: string; tracks: TrackRecord[] };
+export type ProjectRecord = { id: string; title: string; prompt: string; projectType: "mix" | "master"; status: string; createdAt: string; updatedAt: string; tracks: TrackRecord[]; trackCount?: number };
 
 const STORAGE_KEY = "fastmix.projects.v1";
 const ACTIVE_KEY = "fastmix.active-project.v1";
@@ -43,6 +43,7 @@ export async function listProjects(): Promise<ProjectRecord[]> {
           createdAt: String(row.createdAt),
           updatedAt: String(row.updatedAt),
           tracks: existing?.tracks || [],
+          trackCount: Number(row.trackCount || 0),
         } satisfies ProjectRecord;
       });
       writeLocalProjects(projects);
@@ -89,7 +90,13 @@ export function persistProject(project: ProjectRecord) {
   return updated;
 }
 
-export async function removeProject(id: string) {
+export async function removeProject(id: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const body = await response.json().catch(() => ({})) as { error?: string; detail?: string };
+    const localOnly = response.status === 503 && (body.error || "").includes("configure DATABASE_URL");
+    if (!response.ok && response.status !== 404 && !localOnly) return false;
+  } catch { return false; }
   writeLocalProjects(readLocalProjects().filter((project) => project.id !== id));
-  try { await fetch(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" }); } catch { /* Local preview mode can work without a running database. */ }
+  return true;
 }

@@ -3,7 +3,7 @@ import uuid
 
 import psycopg
 import redis
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from psycopg.rows import dict_row
 
 from .uploads import database_url, find_owner, require_internal_app, storage_client
@@ -95,7 +95,7 @@ def retry_job(project_id: uuid.UUID, job_id: uuid.UUID, email: str = Depends(req
 
 
 @router.get("/{project_id}/jobs/{job_id}/download")
-def download_output(project_id: uuid.UUID, job_id: uuid.UUID, email: str = Depends(require_internal_app)):
+def download_output(project_id: uuid.UUID, job_id: uuid.UUID, inline: bool = Query(default=False), email: str = Depends(require_internal_app)):
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
         find_owner(connection, email, project_id)
         output = connection.execute(
@@ -120,7 +120,7 @@ def download_output(project_id: uuid.UUID, job_id: uuid.UUID, email: str = Depen
         )
     url = public_client.generate_presigned_url(
         "get_object",
-        Params={"Bucket": os.environ["S3_BUCKET"], "Key": output["storage_key"], "ResponseContentDisposition": f"attachment; filename=fastmix-preview.{output['format']}"},
+        Params={"Bucket": os.environ["S3_BUCKET"], "Key": output["storage_key"], "ResponseContentDisposition": f"{'inline' if inline else 'attachment'}; filename=fastmix-preview.{output['format']}"},
         ExpiresIn=900,
     )
     return {"url": url, "expiresIn": 900}
