@@ -4,11 +4,11 @@ Last updated: 2026-10-09
 
 ## Current status
 
-- **Build status:** Implementation underway. Local-first MVP with explicit provider integration limits.
-- **Current phase:** Phase 9 - Iterate from usage.
-- **Progress:** Phase 8 repo-level review complete: local exposure and audio limits were tightened; security headers and release checklist added. Production release remains blocked on real identity, staging/runtime verification, and a development dependency advisory.
-- **Current focus:** Set a usage-informed next-release backlog and make sure it distinguishes observed code gaps from actual user evidence, which is not available yet.
-- **Next task:** Reprioritize the backlog after staging/preview usage, telemetry, and support feedback exist. Do not claim user validation from repository review.
+- **Build status:** Phases 0–9 complete as a local-first MVP and evidence-labeled backlog. Production release is not ready until the blockers below are resolved.
+- **Current phase:** Phases 0–9 complete; awaiting staging and real usage evidence.
+- **Progress:** Phase 9 complete as a provisional next-release backlog. It records repository evidence, known release blockers, recommended telemetry, and a reprioritization rule. No real user data was available.
+- **Current focus:** Start a staging/preview cohort after Docker and provider configuration are available; replace provisional priorities with observed task outcomes and support themes.
+- **Next task:** Configure production identity and staging infrastructure, verify critical flows, then collect privacy-respecting usage and support evidence before reprioritizing.
 - **Blockers/dependencies:** TypeScript passes and Compose config parses. Docker Desktop cannot start and Python is not on PATH, so runtime service behavior remains unverified. Credentials remain user-maintained in [credentials.md](credentials.md); do not read unless required.
 
 ## Phase status
@@ -24,7 +24,7 @@ Last updated: 2026-10-09
 | 6. Playback, downloads, and library | Complete | Version history, inline playback, downloads, and deletion cleanup. TypeScript passed; service runtime remains unverified. Pushed. |
 | 7. Account, help, affiliate, and billing | Complete | Browser-local profile preferences, sound guide, support FAQ/contact link, clearly labeled referral preview, and no-purchase billing states. TypeScript and production build passed; real providers are not configured. Pushed. |
 | 8. Security, accessibility, and release readiness | Complete with blockers | Loopback-only Compose ports, upload quotas, job-safe mutation locks, security headers, and release checklist added. Lint, TypeScript, production build, and Compose config passed. Full npm audit has one development lint-toolchain advisory chain; Docker/staging unavailable. See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). |
-| 9. Iterate from usage | In progress | A prioritized, evidence-labeled backlog is written in [nextReleaseBacklog.md](nextReleaseBacklog.md). No real usage data exists yet. |
+| 9. Iterate from usage | Complete (provisional) | Prioritized evidence-labeled backlog and telemetry/review plan are in [nextReleaseBacklog.md](nextReleaseBacklog.md). No user usage data exists; reprioritize after a staging/preview cohort. |
 
 ## Work log
 
