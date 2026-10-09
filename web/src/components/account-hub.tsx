@@ -18,9 +18,12 @@ export default function AccountHub({ email }: { email: string }) {
   const [tab, setTab] = useState("Mix prompts");
 
   useEffect(() => {
-    setName(localStorage.getItem("fastmix.profile.name") || email.split("@")[0]);
-    setLanguage(localStorage.getItem("fastmix.profile.language") || "English");
-    setUpdates(localStorage.getItem("fastmix.profile.updates") === "true");
+    const timer = window.setTimeout(() => {
+      setName(localStorage.getItem("fastmix.profile.name") || email.split("@")[0]);
+      setLanguage(localStorage.getItem("fastmix.profile.language") || "English");
+      setUpdates(localStorage.getItem("fastmix.profile.updates") === "true");
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [email]);
 
   async function copy(value: string, label = "Copied to clipboard") {

@@ -59,16 +59,19 @@ export default function MixerWorkspace() {
     return () => { mounted = false; };
   }, []);
 
+  const projectId = project?.id;
+  const jobId = job?.id;
+  const jobStatus = job?.status;
   useEffect(() => {
-    if (!project || !job || !["queued", "processing"].includes(job.status)) return;
+    if (!projectId || !jobId || !jobStatus || !["queued", "processing"].includes(jobStatus)) return;
     const timer = window.setInterval(() => {
-      void fetch(`/api/projects/${encodeURIComponent(project.id)}/jobs/${encodeURIComponent(job.id)}`, { cache: "no-store" })
+      void fetch(`/api/projects/${encodeURIComponent(projectId)}/jobs/${encodeURIComponent(jobId)}`, { cache: "no-store" })
         .then(async (response) => response.ok ? response.json() as Promise<{ job: Record<string, unknown> }> : null)
         .then((body) => { if (body?.job) setJob(jobFromApi(body.job)); })
         .catch(() => undefined);
     }, 2000);
     return () => window.clearInterval(timer);
-  }, [project?.id, job?.id, job?.status]);
+  }, [projectId, jobId, jobStatus]);
 
   function updateProject(update: Partial<ProjectRecord>) {
     if (!project) return;

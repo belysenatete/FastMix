@@ -13,6 +13,8 @@ from psycopg.rows import dict_row
 
 router = APIRouter(prefix="/api/projects", tags=["tracks"])
 MAX_AUDIO_BYTES = 100 * 1024 * 1024
+MAX_PROJECT_TRACKS = 20
+MAX_PROJECT_AUDIO_BYTES = 500 * 1024 * 1024
 CATEGORIES = {"beat", "lead_vocal", "doubles", "backing_vocals", "adlibs", "instrument", "master"}
 FILE_SIGNATURES = {
     ".wav": lambda data: data.startswith(b"RIFF") and data[8:12] == b"WAVE",
@@ -79,7 +81,9 @@ def list_tracks(project_id: uuid.UUID, email: str = Depends(require_internal_app
 @router.delete("/{project_id}")
 def delete_project(project_id: uuid.UUID, email: str = Depends(require_internal_app)):
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
-        find_owner(connection, email, project_id)
+        owner = connection.execute("SELECT u.id FROM users u JOIN projects p ON p.user_id = u.id WHERE u.email = %s AND p.id = %s FOR UPDATE OF p", (email, project_id)).fetchone()
+        if not owner:
+            raise HTTPException(status_code=404, detail="Project not found")
         active_job = connection.execute("SELECT id FROM processing_jobs WHERE project_id = %s AND status IN ('queued', 'processing') LIMIT 1", (project_id,)).fetchone()
         if active_job:
             raise HTTPException(status_code=409, detail="Wait for the session job to finish before deleting this project")
@@ -138,6 +142,14 @@ def upload_track(
     try:
         with psycopg.connect(database_url(), row_factory=dict_row) as connection:
             owner_id = find_owner(connection, email, project_id)
+            connection.execute("SELECT id FROM projects WHERE id = %s FOR UPDATE", (project_id,))
+            usage = connection.execute("SELECT count(*) AS track_count, COALESCE(sum(size_bytes), 0) AS total_bytes FROM tracks WHERE project_id = %s", (project_id,)).fetchone()
+            if usage["track_count"] >= MAX_PROJECT_TRACKS:
+                raise HTTPException(status_code=413, detail=f"A session can contain at most {MAX_PROJECT_TRACKS} tracks")
+            if usage["total_bytes"] + size_bytes > MAX_PROJECT_AUDIO_BYTES:
+                raise HTTPException(status_code=413, detail="A session can contain at most 500 MB of audio")
+            if connection.execute("SELECT 1 FROM processing_jobs WHERE project_id = %s AND status IN ('queued', 'processing') LIMIT 1", (project_id,)).fetchone():
+                raise HTTPException(status_code=409, detail="Wait for processing to finish before changing tracks")
             storage_key = f"users/{owner_id}/projects/{project_id}/tracks/{track_id}{extension}"
             client.upload_fileobj(file.file, bucket, storage_key, ExtraArgs={"ContentType": file.content_type or "application/octet-stream", "Metadata": {"sha256": digest.hexdigest()}})
             row = connection.execute(
@@ -162,6 +174,9 @@ def upload_track(
 def delete_track(project_id: uuid.UUID, track_id: uuid.UUID, email: str = Depends(require_internal_app)):
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
         find_owner(connection, email, project_id)
+        connection.execute("SELECT id FROM projects WHERE id = %s FOR UPDATE", (project_id,))
+        if connection.execute("SELECT 1 FROM processing_jobs WHERE project_id = %s AND status IN ('queued', 'processing') LIMIT 1", (project_id,)).fetchone():
+            raise HTTPException(status_code=409, detail="Wait for processing to finish before changing tracks")
         row = connection.execute(
             "SELECT storage_key FROM tracks WHERE id = %s AND project_id = %s",
             (track_id, project_id),

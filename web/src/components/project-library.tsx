@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createProject, listProjects, ProjectRecord, removeProject, setActiveProjectId } from "@/lib/projects";
 
 type SortOrder = "newest" | "oldest" | "name-asc" | "name-desc";
@@ -24,7 +24,7 @@ export default function ProjectLibrary() {
   const [audio, setAudio] = useState<{ projectId: string; jobId: string; url: string } | null>(null);
   const [busyVersion, setBusyVersion] = useState("");
 
-  async function withVersions(items: ProjectRecord[]): Promise<LibraryProject[]> {
+  const withVersions = useCallback(async (items: ProjectRecord[]): Promise<LibraryProject[]> => {
     return Promise.all(items.map(async (project) => {
       try {
         const response = await fetch(`/api/projects/${encodeURIComponent(project.id)}/jobs`, { cache: "no-store" });
@@ -35,15 +35,18 @@ export default function ProjectLibrary() {
       } catch { /* Keep the local browser preview available without worker services. */ }
       return { ...project, jobs: [] };
     }));
-  }
+  }, []);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const data = await listProjects();
     setProjects(await withVersions(data));
     setReady(true);
-  }
+  }, [withVersions]);
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void refresh(), 0);
+    return () => window.clearTimeout(timer);
+  }, [refresh]);
 
   const visibleProjects = useMemo(() => {
     const filtered = projects.filter((project) => project.title.toLowerCase().includes(query.trim().toLowerCase()));

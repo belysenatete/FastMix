@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: fastmix
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fastmix_dev_only}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
@@ -21,7 +21,7 @@ services:
     image: redis:8-alpine
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -38,8 +38,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-fastmix_dev}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-fastmix_storage_dev_only}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - audio_data:/data
 
@@ -81,7 +81,7 @@ services:
       S3_BUCKET: ${S3_BUCKET:-fastmix-audio}
       S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy
