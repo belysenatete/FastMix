@@ -1,24 +1,10 @@
 import { NextResponse } from "next/server";
-import { getDemoSession } from "@/lib/demo-auth";
-import { sqlClient } from "@/lib/database";
-
-async function currentUser() {
-  const session = await getDemoSession();
-  if (!session) return null;
-  const sql = sqlClient();
-  if (!sql) return null;
-  const [user] = await sql`
-    INSERT INTO users (email, display_name, auth_provider)
-    VALUES (${session.email}, ${session.name}, 'local')
-    ON CONFLICT (email) DO UPDATE SET updated_at = now()
-    RETURNING id
-  `;
-  return { sql, id: user.id as string };
-}
+import { getApplicationOwner } from "@/lib/clerk-auth";
 
 export async function GET(request: Request) {
-  const owner = await currentUser();
-  if (!owner) return NextResponse.json({ error: "Sign in and configure DATABASE_URL to use database-backed projects." }, { status: 503 });
+  let owner;
+  try { owner = await getApplicationOwner(); } catch { return NextResponse.json({ error: "Project storage is not configured." }, { status: 503 }); }
+  if (!owner) return NextResponse.json({ error: "Sign in to use your projects." }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const query = (searchParams.get("q") || "").slice(0, 120);
   const sort = searchParams.get("sort") || "newest";
@@ -32,8 +18,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const owner = await currentUser();
-  if (!owner) return NextResponse.json({ error: "Sign in and configure DATABASE_URL to save projects." }, { status: 503 });
+  let owner;
+  try { owner = await getApplicationOwner(); } catch { return NextResponse.json({ error: "Project storage is not configured." }, { status: 503 }); }
+  if (!owner) return NextResponse.json({ error: "Sign in to save projects." }, { status: 401 });
   const body = await request.json().catch(() => null) as { id?: unknown; title?: unknown; prompt?: unknown; projectType?: unknown } | null;
   const title = typeof body?.title === "string" ? body.title.trim().slice(0, 120) : "";
   const prompt = typeof body?.prompt === "string" ? body.prompt.slice(0, 4000) : "";

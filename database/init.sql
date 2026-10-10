@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   display_name TEXT NOT NULL DEFAULT '',
   password_hash TEXT,
   auth_provider TEXT NOT NULL DEFAULT 'local',
+  clerk_user_id TEXT,
   preferred_language TEXT NOT NULL DEFAULT 'en' CHECK (preferred_language IN ('en', 'fr')),
   marketing_emails BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -27,13 +27,13 @@ FILE_SIGNATURES = {
 }
 
 
-def require_internal_app(x_internal_secret: str | None = Header(default=None), x_user_email: str | None = Header(default=None)):
+def require_internal_app(x_internal_secret: str | None = Header(default=None), x_user_id: str | None = Header(default=None)):
     expected = os.getenv("INTERNAL_API_SECRET", "")
     if not expected or not x_internal_secret or not hmac.compare_digest(expected, x_internal_secret):
         raise HTTPException(status_code=401, detail="Unauthorized")
-    if not x_user_email or len(x_user_email) > 254 or "@" not in x_user_email:
+    if not x_user_id or len(x_user_id) > 255:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    return x_user_email.lower()
+    return x_user_id
 
 
 def database_url() -> str:
@@ -57,8 +57,8 @@ def storage_client():
     )
 
 
-def find_owner(connection, email: str, project_id: uuid.UUID):
-    user = connection.execute("SELECT id FROM users WHERE email = %s", (email,)).fetchone()
+def find_owner(connection, user_id: str, project_id: uuid.UUID):
+    user = connection.execute("SELECT id FROM users WHERE clerk_user_id = %s", (user_id,)).fetchone()
     if not user:
         raise HTTPException(status_code=404, detail="Project not found")
     project = connection.execute("SELECT id FROM projects WHERE id = %s AND user_id = %s", (project_id, user["id"])).fetchone()
@@ -68,9 +68,9 @@ def find_owner(connection, email: str, project_id: uuid.UUID):
 
 
 @router.get("/{project_id}/tracks")
-def list_tracks(project_id: uuid.UUID, email: str = Depends(require_internal_app)):
+def list_tracks(project_id: uuid.UUID, user_id: str = Depends(require_internal_app)):
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
-        find_owner(connection, email, project_id)
+        find_owner(connection, user_id, project_id)
         rows = connection.execute(
             "SELECT id, category, original_name, mime_type, size_bytes, duration_seconds, created_at FROM tracks WHERE project_id = %s ORDER BY created_at ASC",
             (project_id,),
@@ -79,9 +79,9 @@ def list_tracks(project_id: uuid.UUID, email: str = Depends(require_internal_app
 
 
 @router.delete("/{project_id}")
-def delete_project(project_id: uuid.UUID, email: str = Depends(require_internal_app)):
+def delete_project(project_id: uuid.UUID, user_id: str = Depends(require_internal_app)):
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
-        owner = connection.execute("SELECT u.id FROM users u JOIN projects p ON p.user_id = u.id WHERE u.email = %s AND p.id = %s FOR UPDATE OF p", (email, project_id)).fetchone()
+        owner = connection.execute("SELECT u.id FROM users u JOIN projects p ON p.user_id = u.id WHERE u.clerk_user_id = %s AND p.id = %s FOR UPDATE OF p", (user_id, project_id)).fetchone()
         if not owner:
             raise HTTPException(status_code=404, detail="Project not found")
         active_job = connection.execute("SELECT id FROM processing_jobs WHERE project_id = %s AND status IN ('queued', 'processing') LIMIT 1", (project_id,)).fetchone()
@@ -108,7 +108,7 @@ def upload_track(
     project_id: uuid.UUID,
     category: str = Form(...),
     file: UploadFile = File(...),
-    email: str = Depends(require_internal_app),
+    user_id: str = Depends(require_internal_app),
 ):
     if category not in CATEGORIES:
         raise HTTPException(status_code=400, detail="Unknown track category")
@@ -141,7 +141,7 @@ def upload_track(
     bucket = os.environ["S3_BUCKET"]
     try:
         with psycopg.connect(database_url(), row_factory=dict_row) as connection:
-            owner_id = find_owner(connection, email, project_id)
+            owner_id = find_owner(connection, user_id, project_id)
             connection.execute("SELECT id FROM projects WHERE id = %s FOR UPDATE", (project_id,))
             usage = connection.execute("SELECT count(*) AS track_count, COALESCE(sum(size_bytes), 0) AS total_bytes FROM tracks WHERE project_id = %s", (project_id,)).fetchone()
             if usage["track_count"] >= MAX_PROJECT_TRACKS:
@@ -171,9 +171,9 @@ def upload_track(
 
 
 @router.delete("/{project_id}/tracks/{track_id}")
-def delete_track(project_id: uuid.UUID, track_id: uuid.UUID, email: str = Depends(require_internal_app)):
+def delete_track(project_id: uuid.UUID, track_id: uuid.UUID, user_id: str = Depends(require_internal_app)):
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
-        find_owner(connection, email, project_id)
+        find_owner(connection, user_id, project_id)
         connection.execute("SELECT id FROM projects WHERE id = %s FOR UPDATE", (project_id,))
         if connection.execute("SELECT 1 FROM processing_jobs WHERE project_id = %s AND status IN ('queued', 'processing') LIMIT 1", (project_id,)).fetchone():
             raise HTTPException(status_code=409, detail="Wait for processing to finish before changing tracks")

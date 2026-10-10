@@ -1,19 +1,14 @@
 import { NextResponse } from "next/server";
-import { getDemoSession } from "@/lib/demo-auth";
-import { sqlClient } from "@/lib/database";
+import { getApplicationOwner } from "@/lib/clerk-auth";
 import { proxyWorker } from "@/lib/worker-proxy";
 
 async function getOwner() {
-  const session = await getDemoSession();
-  const sql = sqlClient();
-  if (!session || !sql) return null;
-  const [user] = await sql`INSERT INTO users (email, display_name, auth_provider) VALUES (${session.email}, ${session.name}, 'local') ON CONFLICT (email) DO UPDATE SET updated_at = now() RETURNING id`;
-  return { sql, id: user.id as string };
+  return getApplicationOwner();
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const owner = await getOwner();
-  if (!owner) return NextResponse.json({ error: "Sign in and configure DATABASE_URL to update projects." }, { status: 503 });
+  if (!owner) return NextResponse.json({ error: "Sign in to update projects." }, { status: 401 });
   const { id } = await params;
   const body = await request.json().catch(() => null) as { title?: unknown; prompt?: unknown; projectType?: unknown } | null;
   const title = typeof body?.title === "string" ? body.title.trim().slice(0, 120) : null;
@@ -31,7 +26,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const owner = await getOwner();
-  if (!owner) return NextResponse.json({ error: "Sign in and configure DATABASE_URL to delete projects." }, { status: 503 });
+  if (!owner) return NextResponse.json({ error: "Sign in to delete projects." }, { status: 401 });
   const { id } = await params;
   const [project] = await owner.sql`
     SELECT p.id,

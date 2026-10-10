@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { getDemoSession } from "@/lib/demo-auth";
+import { getClerkSession } from "@/lib/clerk-auth";
 
 export async function proxyWorker(request: Request, workerPath: string, method: "GET" | "POST" | "DELETE") {
-  const session = await getDemoSession();
+  const session = await getClerkSession();
   if (!session) return NextResponse.json({ error: "Sign in to manage tracks." }, { status: 401 });
   const internalSecret = process.env.INTERNAL_API_SECRET;
   if (!internalSecret) return NextResponse.json({ error: "The private audio service is not configured." }, { status: 503 });
@@ -18,7 +18,7 @@ export async function proxyWorker(request: Request, workerPath: string, method: 
 
   const headers = new Headers({
     "X-Internal-Secret": internalSecret,
-    "X-User-Email": session.email,
+    "X-User-ID": session.id,
   });
   const contentType = request.headers.get("content-type");
   if (contentType && method === "POST") headers.set("Content-Type", contentType);

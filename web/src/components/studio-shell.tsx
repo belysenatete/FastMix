@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useClerk } from "@clerk/nextjs";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 
@@ -14,6 +15,7 @@ const navigation = [
 export default function StudioShell({ children, name, email }: { children: ReactNode; name: string; email: string }) {
   const pathname = usePathname();
   const router = useRouter();
+  const clerk = useClerk();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [displayName, setDisplayName] = useState(name);
@@ -27,9 +29,7 @@ export default function StudioShell({ children, name, email }: { children: React
   const initials = displayName.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase() || "FM";
 
   async function signOut() {
-    await fetch("/api/auth/demo", { method: "DELETE" });
-    router.push("/login");
-    router.refresh();
+    await clerk.signOut({ redirectUrl: "/login" });
   }
 
   async function enableNotifications() {

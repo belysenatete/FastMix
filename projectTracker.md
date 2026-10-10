@@ -1,15 +1,15 @@
 # Project tracker
 
-Last updated: 2026-10-10
+Last updated: 2026-10-11
 
 ## Current status
 
 - **Build status:** Phases 0–9 complete as a local-first MVP and evidence-labeled backlog. Production release is not ready until the blockers below are resolved.
 - **Current phase:** Phases 0–9 complete; awaiting staging and real usage evidence.
 - **Progress:** Phase 9 complete as a provisional next-release backlog. It records repository evidence, known release blockers, recommended telemetry, and a reprioritization rule. No real user data was available.
-- **Current focus:** Production-readiness work after the local preview workflow passed in Chromium.
-- **Next task:** Select and configure production identity/audio-processing providers and business policies, then complete the staging security, lifecycle, restore, accessibility, and operations checks.
-- **Blockers/dependencies:** Local browser verified demo sign-in, track upload to private local storage, FFmpeg preview processing, inline playback, and WAV download. Fixed the studio request-time prerender errors and landing waveform hydration mismatch. Production identity, audio processing beyond normalization, payments, hosting, secrets, retention rules, backups/restore, monitoring, and staging remain unconfigured. Full `npm audit` reports five high-severity advisories in the development-only `braces` dependency chain, with no patched version currently published; `npm audit --omit=dev` reports zero vulnerabilities. Local web environment copied from `.env.example` to ignored `web/.env.local`. Credentials remain user-maintained in [credentials.md](credentials.md); do not read unless required.
+- **Current focus:** Clerk development authentication integration.
+- **Next task:** Create and verify your Clerk development account at `http://localhost:3000/signup`; then Codex can verify the signed-in studio and project/audio ownership paths.
+- **Blockers/dependencies:** Clerk SDK, development key wiring, server-side auth, database mapping, and stable Clerk IDs through the audio API are implemented. The database migration ran, production build passed, and the Clerk sign-up form rendered in Chromium. A real account, email verification, protected studio/API access, and account isolation still need runtime verification. Production identity keys/domains, audio processing beyond normalization, payments, hosting, retention rules, backups/restore, monitoring, and staging remain unconfigured. Full `npm audit` reports five high-severity advisories in the development-only `braces` dependency chain, with no patched version currently published; `npm audit --omit=dev` reports zero vulnerabilities. Credentials remain user-maintained in [credentials.md](credentials.md); never display their values.
 
 ## Phase status
 
@@ -17,7 +17,7 @@ Last updated: 2026-10-10
 |---|---|---|
 | 0. Confirm scope and architecture | Complete | Documented scope and local-first MVP; production providers need credentials/configuration. |
 | 1. Repository and local development foundation | Complete | Next.js/TypeScript scaffold, Compose infrastructure, PostgreSQL schema, FastAPI service, and setup README. Pushed. |
-| 2. Public site and authentication | Complete | Local demo auth only; production auth provider remains unconfigured. Pushed. |
+| 2. Public site and authentication | Clerk integration in progress | Replaced demo sign-in with Clerk UI and server session checks; connected app-owned data and worker requests to stable Clerk user IDs. Apply migration and verify live development flow. |
 | 3. Mixer workspace and project data | Complete | Studio shell, session CRUD, project APIs, and library. TypeScript check passed. Pushed. |
 | 4. Secure audio upload and storage | Complete | Private MinIO upload/list/delete track APIs with ownership, signature, and size checks. TypeScript and Compose config passed; runtime unavailable. Pushed. |
 | 5. Asynchronous processing pipeline | Complete | Redis queue, PostgreSQL job lifecycle, retry/recovery, Python FFmpeg mix/master preview, WAV output, and signed downloads. TypeScript and Compose config passed; worker runtime unavailable. Pushed after this tracker update. |
@@ -27,6 +27,8 @@ Last updated: 2026-10-10
 | 9. Iterate from usage | Complete (provisional) | Prioritized evidence-labeled backlog and telemetry/review plan are in [nextReleaseBacklog.md](nextReleaseBacklog.md). No user usage data exists; reprioritize after a staging/preview cohort. |
 
 ## Work log
+
+- 2026-10-11: Integrated Clerk development auth after the user added development keys to `credentials.md`. Installed `@clerk/nextjs`; added the Next.js 16 `src/proxy.ts`, Clerk provider/UI and session reads; removed the email-only demo route/session; added stable Clerk IDs to app and worker ownership paths plus migration `003_clerk_identity.sql`. Copied keys locally to ignored `web/.env.local` without displaying them. Docker migration ran; `npm run build` passed; Chromium rendered the email/password sign-up form. Full sign-in and ownership checks await the user's email verification.
 
 - 2026-10-10: Replaced retired upstream MinIO server/client image references with version-pinned PGSTY Silo server/client images after Docker Hub denied the removed `minio/mc` image and Quay returned 401. User's host successfully pulled these images; Compose config parsing passes, but service runtime still needs host verification.
 - 2026-10-10: User's host successfully pulled storage, Redis, and PostgreSQL images and built both Python worker images. The PostgreSQL 18 container restarted unhealthy. Updated its named-volume mount to `/var/lib/postgresql`, the PostgreSQL 18 image's versioned data-volume location. Compose config parsing passes; container logs/runtime remain inaccessible from the restricted executor.

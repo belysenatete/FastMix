@@ -1,3 +1,3 @@
-import { getDemoSession } from "@/lib/demo-auth";
+import { getClerkSession } from "@/lib/clerk-auth";
 import AccountHub from "@/components/account-hub";
-export default async function SettingsPage() { const session = await getDemoSession(); return <AccountHub email={session?.email || ""} />; }
+export default async function SettingsPage() { const session = await getClerkSession(); return <AccountHub email={session?.email || ""} />; }
