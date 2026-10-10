@@ -15,6 +15,7 @@ This checklist reflects the current local preview. A checked code item does not 
 - [x] Local demo authentication is disabled in production.
 - [x] Studio request-time session validation is kept out of prerendering; landing waveform is hydration-stable.
 - [x] Local browser workflow verified: demo sign-in, track upload, queued FFmpeg preview, inline playback, and WAV download.
+- [x] Mixer and library layouts have no horizontal overflow at a 390 px viewport; keyboard tab focus is visible.
 - [ ] Full dependency audit is clear. Reviewed 2026-10-10: `npm audit --omit=dev` reports zero production vulnerabilities. The full audit reports five findings in the development-only ESLint dependency chain, all through `braces`; its [upstream advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) currently lists no patched version. Do not force the suggested major Next.js lint-config downgrade; recheck for a compatible upstream fix before release.
 
 ## Required before any production deployment
