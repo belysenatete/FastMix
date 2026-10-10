@@ -26,7 +26,7 @@ function Mark() {
 }
 
 function Waveform({ compact = false }: { compact?: boolean }) {
-  return <div className={`waveform${compact ? " waveform-compact" : ""}`} aria-hidden="true">{Array.from({ length: compact ? 34 : 72 }, (_, i) => <i key={i} style={{ "--bar": `${18 + Math.abs(Math.sin(i * 1.73)) * (compact ? 45 : 70)}%`, "--delay": `${(i % 9) * -0.13}s` } as React.CSSProperties} />)}</div>;
+  return <div className={`waveform${compact ? " waveform-compact" : ""}`} aria-hidden="true">{Array.from({ length: compact ? 34 : 72 }, (_, i) => <i key={i} style={{ "--bar": `${Math.round(18 + Math.abs(Math.sin(i * 1.73)) * (compact ? 45 : 70))}%`, "--delay": `${(i % 9) * -0.13}s` } as React.CSSProperties} />)}</div>;
 }
 
 export default function LandingPage() {

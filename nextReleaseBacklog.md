@@ -14,8 +14,8 @@ There is no deployed service, production account, staging environment, or produc
 2. **Prove audio lifecycle in staging.** Run upload, type/size rejection, queued processing, retry, authorized playback/download, project deletion, and object cleanup against the real database, queue, and private storage.
    - Evidence: Docker runtime was unavailable during local review, so these service boundaries are unverified.
    - Signal: upload acceptance/rejection, queue wait, processing duration/failure code, storage error, and deletion completion.
-3. **Close the dependency advisory.** Resolve the high severity `braces` advisory in the development lint dependency tree without downgrading the Next.js toolchain; audit the complete lockfile again.
-   - Evidence: `npm audit --omit=dev` reports zero production vulnerabilities, while full `npm audit` reports five linked high-severity development-tree findings through `eslint-config-next` and `braces` (GHSA-vfj7-8cjw-p6xm). A non-forced `npm audit fix` did not change the tree; npm proposes a breaking downgrade.
+3. **Recheck the dependency advisory before release.** Update the development lint dependency tree when a compatible patched `braces` release or upstream `eslint-config-next` update is available; audit the complete lockfile again.
+   - Evidence: `npm audit --omit=dev` reports zero production vulnerabilities. Full `npm audit` reports five linked high-severity development-tree findings through `eslint-config-next` and `braces` (GHSA-vfj7-8cjw-p6xm). The [upstream advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) currently lists no patched version; npm's suggested forced remediation downgrades the Next.js lint config across a major version.
 4. **Finalize privacy and commercial rules.** Confirm audio retention/deletion, company/vendor disclosures, published support address, pricing/tax/refund/cancellation, affiliate attribution and fraud controls before enabling those flows.
    - Evidence: the current billing and affiliate screens are intentionally informational previews.
 

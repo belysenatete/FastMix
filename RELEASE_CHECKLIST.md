@@ -13,7 +13,9 @@ This checklist reflects the current local preview. A checked code item does not 
 - [x] Track edits and project deletion coordinate with active jobs using project-row locks.
 - [x] Baseline browser security headers are configured; HSTS is emitted for production builds.
 - [x] Local demo authentication is disabled in production.
-- [ ] Full dependency audit is clear. `npm audit` still needs review for development-tool advisories.
+- [x] Studio request-time session validation is kept out of prerendering; landing waveform is hydration-stable.
+- [x] Local browser workflow verified: demo sign-in, track upload, queued FFmpeg preview, inline playback, and WAV download.
+- [ ] Full dependency audit is clear. Reviewed 2026-10-10: `npm audit --omit=dev` reports zero production vulnerabilities. The full audit reports five findings in the development-only ESLint dependency chain, all through `braces`; its [upstream advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) currently lists no patched version. Do not force the suggested major Next.js lint-config downgrade; recheck for a compatible upstream fix before release.
 
 ## Required before any production deployment
 
@@ -31,4 +33,4 @@ This checklist reflects the current local preview. A checked code item does not 
 
 ## Verification limits
 
-The local Docker Engine was unavailable during this phase, so database migrations, object storage, worker processing, service-to-service authorization, deletion, backup, and restore were not exercised at runtime. No staging environment, production identity, payment provider, monitoring account, or real usage telemetry is configured. This repository is not production-ready until the unchecked deployment items are completed and verified.
+The local end-to-end happy path now works against the Docker services, but it does not prove cross-account isolation, adversarial upload handling, queue failure recovery, audio deletion, or backup/restore. The studio currently uses a development-only email demo session, and the worker preview only normalizes audio; no production identity, AI processing provider, payment provider, staging environment, monitoring account, or real usage telemetry is configured. The full audit still reports a high-severity development-only `braces` advisory chain; the advisory currently lists no patched version, while `npm audit --omit=dev` reports zero production dependency vulnerabilities. This repository is not production-ready until the unchecked deployment items are completed and verified.

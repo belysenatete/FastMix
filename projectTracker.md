@@ -1,15 +1,15 @@
 # Project tracker
 
-Last updated: 2026-10-09
+Last updated: 2026-10-10
 
 ## Current status
 
 - **Build status:** Phases 0–9 complete as a local-first MVP and evidence-labeled backlog. Production release is not ready until the blockers below are resolved.
 - **Current phase:** Phases 0–9 complete; awaiting staging and real usage evidence.
 - **Progress:** Phase 9 complete as a provisional next-release backlog. It records repository evidence, known release blockers, recommended telemetry, and a reprioritization rule. No real user data was available.
-- **Current focus:** Start a staging/preview cohort after Docker and provider configuration are available; replace provisional priorities with observed task outcomes and support themes.
-- **Next task:** Configure production identity and staging infrastructure, verify critical flows, then collect privacy-respecting usage and support evidence before reprioritizing.
-- **Blockers/dependencies:** TypeScript passes and Compose config parses. Docker Desktop cannot start and Python is not on PATH, so runtime service behavior remains unverified. Credentials remain user-maintained in [credentials.md](credentials.md); do not read unless required.
+- **Current focus:** Production-readiness work after the local preview workflow passed in Chromium.
+- **Next task:** Select and configure production identity/audio-processing providers and business policies, then complete the staging security, lifecycle, restore, accessibility, and operations checks.
+- **Blockers/dependencies:** Local browser verified demo sign-in, track upload to private local storage, FFmpeg preview processing, inline playback, and WAV download. Fixed the studio request-time prerender errors and landing waveform hydration mismatch. Production identity, audio processing beyond normalization, payments, hosting, secrets, retention rules, backups/restore, monitoring, and staging remain unconfigured. Full `npm audit` reports five high-severity advisories in the development-only `braces` dependency chain, with no patched version currently published; `npm audit --omit=dev` reports zero vulnerabilities. Local web environment copied from `.env.example` to ignored `web/.env.local`. Credentials remain user-maintained in [credentials.md](credentials.md); do not read unless required.
 
 ## Phase status
 
@@ -21,12 +21,18 @@ Last updated: 2026-10-09
 | 3. Mixer workspace and project data | Complete | Studio shell, session CRUD, project APIs, and library. TypeScript check passed. Pushed. |
 | 4. Secure audio upload and storage | Complete | Private MinIO upload/list/delete track APIs with ownership, signature, and size checks. TypeScript and Compose config passed; runtime unavailable. Pushed. |
 | 5. Asynchronous processing pipeline | Complete | Redis queue, PostgreSQL job lifecycle, retry/recovery, Python FFmpeg mix/master preview, WAV output, and signed downloads. TypeScript and Compose config passed; worker runtime unavailable. Pushed after this tracker update. |
-| 6. Playback, downloads, and library | Complete | Version history, inline playback, downloads, and deletion cleanup. TypeScript passed; service runtime remains unverified. Pushed. |
+| 6. Playback, downloads, and library | Complete locally; production verification open | Version history playback/download and mixer output controls verified against the local services; account isolation and deletion cleanup still need staging verification. |
 | 7. Account, help, affiliate, and billing | Complete | Browser-local profile preferences, sound guide, support FAQ/contact link, clearly labeled referral preview, and no-purchase billing states. TypeScript and production build passed; real providers are not configured. Pushed. |
-| 8. Security, accessibility, and release readiness | Complete with blockers | Loopback-only Compose ports, upload quotas, job-safe mutation locks, security headers, and release checklist added. Lint, TypeScript, production build, and Compose config passed. Full npm audit has one development lint-toolchain advisory chain; Docker/staging unavailable. See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). |
+| 8. Security, accessibility, and release readiness | Local checks complete; production blockers open | Loopback-only Compose ports, upload quotas, job-safe mutation locks, security headers, runtime-rendering fixes, and mixer playback control. Build and lint pass; local browser audio workflow passes. Production identity, provider policy, full accessibility review, full audit remediation, operations, and staging verification remain open. See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). |
 | 9. Iterate from usage | Complete (provisional) | Prioritized evidence-labeled backlog and telemetry/review plan are in [nextReleaseBacklog.md](nextReleaseBacklog.md). No user usage data exists; reprioritize after a staging/preview cohort. |
 
 ## Work log
+
+- 2026-10-10: Replaced retired upstream MinIO server/client image references with version-pinned PGSTY Silo server/client images after Docker Hub denied the removed `minio/mc` image and Quay returned 401. User's host successfully pulled these images; Compose config parsing passes, but service runtime still needs host verification.
+- 2026-10-10: User's host successfully pulled storage, Redis, and PostgreSQL images and built both Python worker images. The PostgreSQL 18 container restarted unhealthy. Updated its named-volume mount to `/var/lib/postgresql`, the PostgreSQL 18 image's versioned data-volume location. Compose config parsing passes; container logs/runtime remain inaccessible from the restricted executor.
+- 2026-10-10: User confirmed successful Compose startup after the PostgreSQL 18 volume-path correction: db and Redis healthy; Silo running; API and processor started; storage-init and migrate completed. Created ignored `web/.env.local` from `.env.example` for local preview configuration. Next verify the browser workflow.
+- 2026-10-10: Started the Next.js dev server from `web/`; `/` returned HTTP 200. The user ran `npm run dev` from the repository root and got ENOENT; verified the app package is under `web/`. The local browser workflow is now verified in Chromium.
+- 2026-10-10: Production-readiness iteration: moved studio cookie/session validation to a request-time Suspense boundary, rounded decorative waveform heights to avoid server/client float mismatch, and added an inline audio player to completed mixer sessions. `npm run build` passed; `npm run lint -- src` passed; Chromium reported no console errors on the landing/studio routes and confirmed playback of the 3-second output plus WAV download. `npm audit --omit=dev` found 0 vulnerabilities. Full audit still reports five linked high-severity `braces` advisories in the development lint-toolchain dependency tree; the upstream advisory lists no patched version. Updated release checklist; production gates remain open.
 
 - 2026-10-09: Build authorized through Phase 7; the user requested a commit and push at the end of each phase.
 - 2026-10-09: Phase 8 repo-level security and release review completed. Bound local service ports to loopback, added 20-track/500 MB project audio caps, coordinated track/project mutation with active jobs, added browser security headers and release checklist. Lint, TypeScript, production build, and Compose config passed. Full audit still reports development `braces` advisory chain; Docker/staging not available.
