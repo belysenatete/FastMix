@@ -19,6 +19,17 @@ def queue_client():
     return redis.Redis.from_url(redis_url, socket_timeout=5, decode_responses=True)
 
 
+def enqueue(job_id: uuid.UUID, project_id: uuid.UUID):
+    """Dispatch a queued job, or fail it visibly when the queue is down so the project is not left stuck."""
+    try:
+        queue_client().rpush(QUEUE_NAME, str(job_id))
+    except Exception as error:
+        with psycopg.connect(database_url()) as connection:
+            connection.execute("UPDATE processing_jobs SET status = 'failed', error_code = 'queue_unavailable', updated_at = now() WHERE id = %s", (job_id,))
+            connection.execute("UPDATE projects SET status = 'failed', updated_at = now() WHERE id = %s", (project_id,))
+        raise HTTPException(status_code=503, detail="The preview processor is unavailable. Please retry shortly.") from error
+
+
 @router.post("/{project_id}/jobs", status_code=202)
 def create_job(project_id: uuid.UUID, user_id: str = Depends(require_internal_app)):
     job_id = uuid.uuid4()
@@ -38,17 +49,43 @@ def create_job(project_id: uuid.UUID, user_id: str = Depends(require_internal_ap
         if project["project_type"] == "master" and tracks != 1:
             raise HTTPException(status_code=400, detail="A mastering preview needs exactly one finished track")
         job = connection.execute(
-            "INSERT INTO processing_jobs (id, project_id, status, progress, processor) VALUES (%s, %s, 'queued', 0, %s) RETURNING id, project_id, status, progress, processor, attempt, created_at, updated_at",
+            "INSERT INTO processing_jobs (id, project_id, status, progress, processor) VALUES (%s, %s, 'queued', 0, %s) RETURNING id, project_id, status, progress, processor, attempt, render, source_job_id, created_at, updated_at",
             (job_id, project_id, processor),
         ).fetchone()
         connection.execute("UPDATE projects SET status = 'queued', updated_at = now() WHERE id = %s", (project_id,))
-    try:
-        queue_client().rpush(QUEUE_NAME, str(job_id))
-    except Exception as error:
-        with psycopg.connect(database_url()) as connection:
-            connection.execute("UPDATE processing_jobs SET status = 'failed', error_code = 'queue_unavailable', updated_at = now() WHERE id = %s", (job_id,))
-            connection.execute("UPDATE projects SET status = 'failed', updated_at = now() WHERE id = %s", (project_id,))
-        raise HTTPException(status_code=503, detail="The preview processor is unavailable. Please retry shortly.") from error
+    enqueue(job_id, project_id)
+    return {"job": job}
+
+
+@router.post("/{project_id}/jobs/{job_id}/full", status_code=202)
+def create_full_render(project_id: uuid.UUID, job_id: uuid.UUID, user_id: str = Depends(require_internal_app)):
+    """Render a completed AI preview at full length. Spends provider credits once per preview."""
+    full_job_id = uuid.uuid4()
+    with psycopg.connect(database_url(), row_factory=dict_row) as connection:
+        find_owner(connection, user_id, project_id)
+        connection.execute("SELECT id FROM projects WHERE id = %s FOR UPDATE", (project_id,))
+        source = connection.execute(
+            "SELECT id, status, processor, render, provider_data FROM processing_jobs WHERE id = %s AND project_id = %s",
+            (job_id, project_id),
+        ).fetchone()
+        if not source:
+            raise HTTPException(status_code=404, detail="Processing job not found")
+        if source["render"] != "preview" or source["processor"] != "roex_tonn" or source["status"] != "completed" or not source["provider_data"]:
+            raise HTTPException(status_code=409, detail="Only a completed AI preview can be rendered as a full track")
+        existing = connection.execute(
+            "SELECT j.id, j.project_id, j.status, j.progress, j.processor, j.attempt, j.error_code, j.render, j.source_job_id, j.created_at, j.updated_at, o.format AS output_format, o.size_bytes AS output_size_bytes FROM processing_jobs j LEFT JOIN outputs o ON o.job_id = j.id WHERE j.source_job_id = %s AND j.render = 'full'",
+            (job_id,),
+        ).fetchone()
+        if existing:
+            return {"job": existing}
+        if connection.execute("SELECT 1 FROM processing_jobs WHERE project_id = %s AND status IN ('queued', 'processing') LIMIT 1", (project_id,)).fetchone():
+            raise HTTPException(status_code=409, detail="A session job is already in progress")
+        job = connection.execute(
+            "INSERT INTO processing_jobs (id, project_id, status, progress, processor, render, source_job_id) VALUES (%s, %s, 'queued', 0, 'roex_tonn', 'full', %s) RETURNING id, project_id, status, progress, processor, attempt, render, source_job_id, created_at, updated_at",
+            (full_job_id, project_id, job_id),
+        ).fetchone()
+        connection.execute("UPDATE projects SET status = 'queued', updated_at = now() WHERE id = %s", (project_id,))
+    enqueue(full_job_id, project_id)
     return {"job": job}
 
 
@@ -57,7 +94,7 @@ def list_jobs(project_id: uuid.UUID, user_id: str = Depends(require_internal_app
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
         find_owner(connection, user_id, project_id)
         jobs = connection.execute(
-            "SELECT j.id, j.project_id, j.status, j.progress, j.processor, j.attempt, j.error_code, j.created_at, j.updated_at, o.format AS output_format, o.size_bytes AS output_size_bytes FROM processing_jobs j LEFT JOIN outputs o ON o.job_id = j.id WHERE j.project_id = %s ORDER BY j.created_at DESC LIMIT 20",
+            "SELECT j.id, j.project_id, j.status, j.progress, j.processor, j.attempt, j.error_code, j.render, j.source_job_id, j.created_at, j.updated_at, o.format AS output_format, o.size_bytes AS output_size_bytes FROM processing_jobs j LEFT JOIN outputs o ON o.job_id = j.id WHERE j.project_id = %s ORDER BY j.created_at DESC LIMIT 20",
             (project_id,),
         ).fetchall()
     return {"jobs": jobs}
@@ -68,7 +105,7 @@ def get_job(project_id: uuid.UUID, job_id: uuid.UUID, user_id: str = Depends(req
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
         find_owner(connection, user_id, project_id)
         job = connection.execute(
-            "SELECT j.id, j.project_id, j.status, j.progress, j.processor, j.attempt, j.error_code, j.created_at, j.updated_at, o.format AS output_format, o.size_bytes AS output_size_bytes FROM processing_jobs j LEFT JOIN outputs o ON o.job_id = j.id WHERE j.project_id = %s AND j.id = %s",
+            "SELECT j.id, j.project_id, j.status, j.progress, j.processor, j.attempt, j.error_code, j.render, j.source_job_id, j.created_at, j.updated_at, o.format AS output_format, o.size_bytes AS output_size_bytes FROM processing_jobs j LEFT JOIN outputs o ON o.job_id = j.id WHERE j.project_id = %s AND j.id = %s",
             (project_id, job_id),
         ).fetchone()
     if not job:
@@ -80,20 +117,17 @@ def get_job(project_id: uuid.UUID, job_id: uuid.UUID, user_id: str = Depends(req
 def retry_job(project_id: uuid.UUID, job_id: uuid.UUID, user_id: str = Depends(require_internal_app)):
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
         find_owner(connection, user_id, project_id)
+        connection.execute("SELECT id FROM projects WHERE id = %s FOR UPDATE", (project_id,))
+        if connection.execute("SELECT 1 FROM processing_jobs WHERE project_id = %s AND status IN ('queued', 'processing') LIMIT 1", (project_id,)).fetchone():
+            raise HTTPException(status_code=409, detail="A session job is already in progress")
         job = connection.execute(
-            "UPDATE processing_jobs SET status = 'queued', progress = 0, error_code = NULL, attempt = attempt + 1, updated_at = now() WHERE project_id = %s AND id = %s AND status = 'failed' RETURNING id, project_id, status, progress, processor, attempt, created_at, updated_at",
+            "UPDATE processing_jobs SET status = 'queued', progress = 0, error_code = NULL, attempt = attempt + 1, updated_at = now() WHERE project_id = %s AND id = %s AND status = 'failed' RETURNING id, project_id, status, progress, processor, attempt, render, source_job_id, created_at, updated_at",
             (project_id, job_id),
         ).fetchone()
         if not job:
             raise HTTPException(status_code=409, detail="Only a failed job can be retried")
         connection.execute("UPDATE projects SET status = 'queued', updated_at = now() WHERE id = %s", (project_id,))
-    try:
-        queue_client().rpush(QUEUE_NAME, str(job_id))
-    except Exception as error:
-        with psycopg.connect(database_url()) as connection:
-            connection.execute("UPDATE processing_jobs SET status = 'failed', error_code = 'queue_unavailable', updated_at = now() WHERE id = %s", (job_id,))
-            connection.execute("UPDATE projects SET status = 'failed', updated_at = now() WHERE id = %s", (project_id,))
-        raise HTTPException(status_code=503, detail="The preview processor is unavailable. Please retry shortly.") from error
+    enqueue(job_id, project_id)
     return {"job": job}
 
 
@@ -102,7 +136,7 @@ def download_output(project_id: uuid.UUID, job_id: uuid.UUID, inline: bool = Que
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
         find_owner(connection, user_id, project_id)
         output = connection.execute(
-            "SELECT o.storage_key, o.format FROM outputs o JOIN processing_jobs j ON j.id = o.job_id WHERE j.id = %s AND j.project_id = %s AND j.status = 'completed'",
+            "SELECT o.storage_key, o.format, j.render FROM outputs o JOIN processing_jobs j ON j.id = o.job_id WHERE j.id = %s AND j.project_id = %s AND j.status = 'completed'",
             (job_id, project_id),
         ).fetchone()
     if not output:
@@ -123,7 +157,7 @@ def download_output(project_id: uuid.UUID, job_id: uuid.UUID, inline: bool = Que
         )
     url = public_client.generate_presigned_url(
         "get_object",
-        Params={"Bucket": os.environ["S3_BUCKET"], "Key": output["storage_key"], "ResponseContentDisposition": f"{'inline' if inline else 'attachment'}; filename=fastmix-preview.{output['format']}"},
+        Params={"Bucket": os.environ["S3_BUCKET"], "Key": output["storage_key"], "ResponseContentDisposition": f"{'inline' if inline else 'attachment'}; filename=fastmix-{output['render']}.{output['format']}"},
         ExpiresIn=900,
     )
     return {"url": url, "expiresIn": 900}

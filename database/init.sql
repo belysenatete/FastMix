@@ -45,11 +45,15 @@ CREATE TABLE IF NOT EXISTS processing_jobs (
   processor TEXT NOT NULL DEFAULT 'demo',
   attempt INTEGER NOT NULL DEFAULT 0,
   error_code TEXT,
+  render TEXT NOT NULL DEFAULT 'preview' CHECK (render IN ('preview', 'full')),
+  source_job_id UUID REFERENCES processing_jobs(id) ON DELETE CASCADE,
+  provider_data JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS jobs_queue ON processing_jobs(created_at) WHERE status = 'queued';
 CREATE UNIQUE INDEX IF NOT EXISTS jobs_one_active_per_project ON processing_jobs(project_id) WHERE status IN ('queued', 'processing');
+CREATE UNIQUE INDEX IF NOT EXISTS jobs_one_full_per_source ON processing_jobs(source_job_id) WHERE render = 'full';
 
 CREATE TABLE IF NOT EXISTS outputs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

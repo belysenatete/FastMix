@@ -16,6 +16,14 @@ FastMix is a local-first music mixing studio MVP, inspired by the observed Easym
 3. Start the web app: `cd web && npm install && npm run dev`.
 4. Open `http://localhost:3000` and enter the local preview. MinIO's local console is at `http://localhost:9001`.
 
-To enable RoEx AI previews, create a Tonn API account and request API access, then add its key to the ignored root `.env` file as `ROEX_API_KEY=your_key`, then rebuild the API and processor with `docker compose up -d --build api processor`. Without this key the app uses local FFmpeg. RoEx preview mode uploads audio to RoEx Tonn for processing; mixing previews request no billable full-length mix, and mastering previews are 30 seconds. The API key must belong to an account with a positive credit balance for previews. Do not enable automatic credit top-ups unless you intend to pay for them. RoEx final-mix retrieval is not enabled in the app. See [Tonn's security and data handling notes](https://tonn-portal.roexaudio.com/security-and-data-handling) before sending private or unreleased tracks.
+To enable RoEx AI mixing and mastering, create a Tonn API account at [tonn-portal.roexaudio.com](https://tonn-portal.roexaudio.com) and request API access (new accounts get 1,000 free credits). Add the key to the ignored root `.env` file as `ROEX_API_KEY=your_key`, then rebuild with `docker compose up -d --build api processor`. Without this key the app uses local FFmpeg. With RoEx enabled, audio is uploaded to RoEx Tonn and each session picks a workflow:
+
+- **One beat + one vocal:** RoEx recombine mixes the vocal onto the beat and masters it, with genre styles such as trap, afrobeat and reggaeton.
+- **Two or more stems:** RoEx multitrack mix, then local two-pass loudness finishing.
+- **One finished track (Master mode):** RoEx mastering.
+
+Every job starts with a free 30-second preview (free while the account has a positive credit balance). The full-length track is rendered only when the user clicks **Get full track** and costs about 220–250 credits ($1.76–$2.50) once per version; the paid result URL is saved so retries never pay twice. Do not enable automatic credit top-ups unless you intend to pay for them. See [Tonn's security and data handling notes](https://tonn-portal.roexaudio.com/security-and-data-handling) before sending private or unreleased tracks.
+
+Worker unit tests run inside the API image: `docker compose run --rm -v ./worker/tests:/srv/fastmix/tests:ro --no-deps api python -m unittest discover -s tests`.
 
 Audio uploads require the Compose API and private object storage. See `phases.md`, `projectDescription.md`, `projectTracker.md`, and `codingPrinciples.md` for product scope and implementation status.

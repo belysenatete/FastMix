@@ -1,7 +1,9 @@
-"""RoEx Tonn preview integration.
+"""RoEx Tonn integration.
 
-The integration only retrieves free preview results. It never retrieves billable
-full-length mixes or masters.
+Previews are free while the RoEx account has a positive credit balance.
+Full-length renders spend credits, so they only run for an explicit full-render
+job that reuses the preview's provider task. The provider's final URL is saved
+as soon as RoEx returns it, so a retried download never pays twice.
 """
 
 import json
@@ -16,28 +18,39 @@ from urllib.parse import urlsplit
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from .audio import finish_loudness
+
 
 BASE_URL = "https://tonn.roexaudio.com"
 POLL_SECONDS = 5
-POLL_TIMEOUT_SECONDS = 600
+POLL_TIMEOUT_SECONDS = 900
 MAX_OUTPUT_BYTES = 500 * 1024 * 1024
+VOCAL_CATEGORIES = {"lead_vocal", "doubles", "backing_vocals", "adlibs"}
+LOUDNESS_TARGET_LUFS = {"LOW": -14.0, "MEDIUM": -11.0, "HIGH": -9.0}
 
 
 class RoExError(RuntimeError):
-    """A provider error safe to include in operational logs."""
+    """A provider error whose message is safe to show users and write to logs."""
+
+    def __init__(self, message: str, code: str = "provider_failed"):
+        super().__init__(message)
+        self.code = code
 
 
-def _api_request(path: str, payload: dict) -> tuple[int, dict]:
+def _normalize(text: str) -> str:
+    return "".join(character for character in unicodedata.normalize("NFKD", text.lower()) if not unicodedata.combining(character))
+
+
+def _api_request(path: str, payload: dict | None = None, method: str = "POST") -> tuple[int, dict]:
     api_key = os.getenv("ROEX_API_KEY", "").strip()
     if not api_key:
-        raise RoExError("RoEx Tonn is selected, but ROEX_API_KEY is not configured")
+        raise RoExError("RoEx Tonn is selected, but ROEX_API_KEY is not configured", "provider_not_configured")
 
-    body = json.dumps(payload).encode("utf-8")
     request = Request(
         f"{BASE_URL}{path}",
-        data=body,
+        data=json.dumps(payload).encode("utf-8") if payload is not None else None,
         headers={"X-API-Key": api_key, "Content-Type": "application/json"},
-        method="POST",
+        method=method,
     )
     try:
         with urlopen(request, timeout=45) as response:
@@ -45,6 +58,10 @@ def _api_request(path: str, payload: dict) -> tuple[int, dict]:
             return response.status, json.loads(raw) if raw else {}
     except HTTPError as error:
         # Provider response bodies can contain diagnostics; keep them out of logs.
+        if error.code == 402:
+            raise RoExError("Your RoEx credit balance is too low for a full-length track. Add credits, then retry.", "provider_credits") from error
+        if error.code == 401:
+            raise RoExError("RoEx rejected the API key. Check ROEX_API_KEY.", "provider_auth") from error
         raise RoExError(f"RoEx Tonn request failed with HTTP {error.code}") from error
     except (TimeoutError, URLError, OSError) as error:
         raise RoExError("RoEx Tonn could not be reached") from error
@@ -54,10 +71,7 @@ def _api_request(path: str, payload: dict) -> tuple[int, dict]:
 
 def _upload(path: Path) -> str:
     content_type = "audio/wav"
-    status, response = _api_request(
-        "/upload",
-        {"filename": path.name, "contentType": content_type},
-    )
+    status, response = _api_request("/upload", {"filename": path.name, "contentType": content_type})
     if status != 200:
         raise RoExError(f"RoEx Tonn upload URL request failed with HTTP {status}")
     signed_url = response.get("signed_url")
@@ -88,71 +102,121 @@ def _upload(path: Path) -> str:
     return readable_url
 
 
-def _download(url: str, target: Path) -> str:
+def _download(url: str, workdir: Path) -> tuple[Path, str]:
     if not url.startswith("https://"):
         raise RoExError("RoEx Tonn returned an invalid audio download URL")
+    target = workdir / "roex-output.download"
     try:
-        with urlopen(Request(url), timeout=90) as response, target.open("wb") as output:
+        with urlopen(Request(url), timeout=120) as response, target.open("wb") as output:
             total = 0
             while chunk := response.read(1024 * 1024):
                 total += len(chunk)
                 if total > MAX_OUTPUT_BYTES:
-                    raise RoExError("RoEx Tonn preview exceeded the local output size limit")
+                    raise RoExError("RoEx Tonn output exceeded the local output size limit")
                 output.write(chunk)
             if total == 0:
-                raise RoExError("RoEx Tonn returned an empty audio preview")
+                raise RoExError("RoEx Tonn returned an empty audio file")
             content_type = response.headers.get("Content-Type", "").lower()
     except HTTPError as error:
-        raise RoExError(f"RoEx Tonn audio download failed with HTTP {error.code}") from error
+        code = "provider_expired" if error.code in {403, 404} else "provider_failed"
+        raise RoExError(f"RoEx Tonn audio download failed with HTTP {error.code}", code) from error
     except (TimeoutError, URLError, OSError) as error:
         raise RoExError("RoEx Tonn audio download failed") from error
-    if "mpeg" in content_type or "mp3" in content_type:
-        return "mp3"
-    if "flac" in content_type:
-        return "flac"
-    return "wav"
+    extension = Path(urlsplit(url).path).suffix.lower().lstrip(".")
+    if "mpeg" in content_type or "mp3" in content_type or extension == "mp3":
+        output_format = "mp3"
+    elif "flac" in content_type or extension == "flac":
+        output_format = "flac"
+    else:
+        output_format = "wav"
+    final = target.with_name(f"roex-output.{output_format}")
+    target.replace(final)
+    return final, output_format
 
 
-def _style(prompt: str) -> str:
-    text = "".join(character for character in unicodedata.normalize("NFKD", prompt.lower()) if not unicodedata.combining(character))
-    if re.search(r"\b(trap|drill|rap|hip[ -]?hop|grime|afrobeat|afro)\b", text):
-        return "HIPHOP_GRIME"
-    if re.search(r"\b(pop|catchy|radio)\b", text):
-        return "POP"
-    if re.search(r"\b(acoustic|acoustique|folk|unplugged)\b", text):
-        return "ACOUSTIC"
-    if re.search(r"\b(electronic|electronique|edm|techno|house|synth)\b", text):
-        return "ELECTRONIC"
-    if re.search(r"\b(metal|heavy)\b", text):
-        return "METAL"
-    if re.search(r"\b(rock|indie|guitar band)\b", text):
-        return "ROCK_INDIE"
-    if re.search(r"\b(reggae|dub)\b", text):
-        return "REGGAE_DUB"
-    if re.search(r"\b(orchestral|orchestral|cinematic|strings|cinematique)\b", text):
-        return "ORCHESTRAL"
+STYLE_PATTERNS = [
+    # Recombine-only styles first; they are the closest match for Easymix's genres.
+    (r"\b(reggaeton|dembow)\b", "REGGAETON", True),
+    (r"\b(afro|afrobeats?|afro ?trap|afroswing|amapiano)\b", "AFROBEAT", True),
+    (r"\b(trap|drill|rage|phonk)\b", "TRAP", True),
+    (r"\b(lo-?fi)\b", "LO_FI", True),
+    (r"\b(k-?pop)\b", "K_POP", True),
+    (r"\b(latin|latino|salsa|bachata)\b", "LATIN", True),
+    (r"\b(jazz|jazzy)\b", "JAZZ", True),
+    (r"\b(house)\b", "HOUSE", True),
+    (r"\b(techno)\b", "TECHNO", True),
+    (r"\b(country)\b", "COUNTRY_ACOUSTIC", True),
+    (r"\b(cinematic|cinematique|film score)\b", "CINEMATIC", True),
+    (r"\b(trap|drill|rap|hip[ -]?hop|grime|afro|afrobeats?|boom ?bap|cloud ?rap|phonk|rnb|r&b)\b", "HIPHOP_GRIME", False),
+    (r"\b(pop|catchy|radio)\b", "POP", False),
+    (r"\b(acoustic|acoustique|folk|unplugged)\b", "ACOUSTIC", False),
+    (r"\b(electronic|electronique|edm|techno|house|synth)\b", "ELECTRONIC", False),
+    (r"\b(metal|heavy)\b", "METAL", False),
+    (r"\b(rock|indie|guitar band)\b", "ROCK_INDIE", False),
+    (r"\b(reggae|dub)\b", "REGGAE_DUB", False),
+    (r"\b(orchestral|cinematic|strings|cinematique)\b", "ORCHESTRAL", False),
+]
+
+
+def _style(prompt: str, endpoint: str = "mix") -> str:
+    """Map free-text direction to the style enum accepted by the given endpoint."""
+    text = _normalize(prompt)
+    for pattern, style, extended_only in STYLE_PATTERNS:
+        if extended_only and endpoint != "recombine":
+            continue
+        if style == "ORCHESTRAL" and endpoint == "master":
+            continue  # /masteringpreview does not accept ORCHESTRAL.
+        if re.search(pattern, text):
+            return style
     return "OTHER"
 
 
+def _loudness(prompt: str) -> str:
+    text = _normalize(prompt)
+    if re.search(r"\b(loud|louder|club|competitive|aggressive|banger|fort|puissant)\b", text):
+        return "HIGH"
+    if re.search(r"\b(dynamic|dynamique|quiet|soft|gentle|natural|naturel|doux)\b", text):
+        return "LOW"
+    return "MEDIUM"
+
+
+def _vocal_gain(prompt: str) -> float:
+    text = _normalize(prompt)
+    if re.search(r"\b(vocals? (upfront|forward|louder|on top)|louder vocals?|voix (devant|en avant|plus forte))\b", text):
+        return 2.0
+    if re.search(r"\b(vocals? (back|lower|quieter|buried|blended)|quieter vocals?|voix (plus basse|en retrait))\b", text):
+        return -2.0
+    return 0.0
+
+
 def _reverb(prompt: str, category: str) -> str:
-    text = "".join(character for character in unicodedata.normalize("NFKD", prompt.lower()) if not unicodedata.combining(character))
-    if category not in {"lead_vocal", "doubles", "backing_vocals", "adlibs"}:
+    text = _normalize(prompt)
+    if category not in VOCAL_CATEGORIES:
         return "NONE"
     if re.search(r"\b(dry|sec|seche|no reverb|without reverb|sans reverbe)\b", text):
         return "NONE"
     if re.search(r"\b(lush|spacious|echoey|echoing|heavy reverb|lots of reverb)\b", text):
         return "HIGH"
-    if re.search(r"\b(reverb|reverbe|roomy|space|ambient|spacieux)\b", text):
+    if re.search(r"\b(some reverb|medium reverb|roomy|space|spacieux)\b", text):
+        return "MEDIUM"
+    if re.search(r"\b(reverb|reverbe|ambient)\b", text):
         return "LOW"
     return "NONE"
 
 
+def plan(job: dict) -> str:
+    """Choose the RoEx workflow for a session: master, recombine, or multitrack."""
+    if job["project_type"] == "master":
+        return "master"
+    categories = [track["category"] for track in job["tracks"]]
+    if len(categories) == 2 and categories.count("beat") == 1 and sum(category in VOCAL_CATEGORIES for category in categories) == 1:
+        return "recombine"
+    return "multitrack"
+
+
 def _prepare_track(source: Path, target: Path, max_duration_seconds: int) -> None:
     probe = subprocess.run(
-        [
-            "ffprobe", "-v", "error", "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1", str(source),
-        ],
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(source)],
         check=True,
         capture_output=True,
         text=True,
@@ -161,80 +225,108 @@ def _prepare_track(source: Path, target: Path, max_duration_seconds: int) -> Non
     try:
         duration = float(probe.stdout.strip())
     except ValueError as error:
-        raise RoExError("One of the audio tracks has an invalid duration") from error
+        raise RoExError("One of the audio tracks has an invalid duration", "invalid_audio") from error
     if duration <= 0 or duration > max_duration_seconds:
-        limit = max_duration_seconds // 60
-        raise RoExError(f"RoEx Tonn accepts tracks up to {limit} minutes long for this job")
+        raise RoExError(f"RoEx Tonn accepts tracks up to {max_duration_seconds // 60} minutes long for this job", "invalid_audio")
     subprocess.run(
-        [
-            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source),
-            "-vn", "-ar", "44100", "-c:a", "pcm_s24le", str(target),
-        ],
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source), "-vn", "-ar", "44100", "-c:a", "pcm_s24le", str(target)],
         check=True,
         capture_output=True,
         timeout=600,
     )
 
 
-def _poll_result(path: str, payload: dict, result_key: str, url_key: str) -> str:
+def _poll(path: str, payload: dict | None, extract, method: str = "POST") -> object:
+    """Call an endpoint until it stops answering 202 and `extract` finds a result."""
     deadline = time.monotonic() + POLL_TIMEOUT_SECONDS
     while time.monotonic() < deadline:
-        status, response = _api_request(path, payload)
+        status, response = _api_request(path, payload, method)
         if status == 202:
             time.sleep(POLL_SECONDS)
             continue
         if status != 200:
-            raise RoExError(f"RoEx Tonn preview retrieval failed with HTTP {status}")
+            raise RoExError(f"RoEx Tonn result retrieval failed with HTTP {status}")
+        result = extract(response)
+        if result:
+            return result
+        time.sleep(POLL_SECONDS)
+    raise RoExError("RoEx Tonn processing timed out")
+
+
+def _task_failed(result: dict) -> bool:
+    return bool(result.get("error")) or str(result.get("status", "")).lower() == "failed"
+
+
+def _preview_url(result_key: str, url_key: str):
+    def extract(response: dict):
         result = response.get(result_key)
         if not isinstance(result, dict):
             raise RoExError("RoEx Tonn preview response did not contain a result")
-        if result.get("error") or str(result.get("status", "")).lower() == "failed":
-            raise RoExError("RoEx Tonn could not process this audio")
+        if _task_failed(result):
+            raise RoExError("RoEx Tonn could not process this audio", "invalid_audio")
         url = result.get(url_key)
-        if isinstance(url, str) and url:
-            return url
-        time.sleep(POLL_SECONDS)
-    raise RoExError("RoEx Tonn preview timed out")
+        return url if isinstance(url, str) and url else None
+    return extract
 
 
-def create_preview(job: dict, source_paths: list[Path], output_path: Path, progress) -> str:
-    """Create a free AI mixing or mastering preview and save it locally."""
+def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress) -> tuple[Path, str, dict]:
+    """Create a free 30-second AI preview. Returns the local file, its format, and provider data."""
+    workflow = plan(job)
+    prompt = job.get("prompt", "")
+    max_duration_seconds = 10 * 60 if workflow == "master" else 8 * 60
     prepared: list[Path] = []
-    max_duration_seconds = 10 * 60 if job["project_type"] == "master" else 8 * 60
     for index, source in enumerate(source_paths):
-        target = output_path.parent / f"roex-track-{index}.wav"
+        target = workdir / f"roex-track-{index}.wav"
         _prepare_track(source, target, max_duration_seconds)
         prepared.append(target)
 
-    if job["project_type"] == "master":
+    if workflow == "master":
         if len(prepared) != 1:
-            raise RoExError("AI mastering requires exactly one finished track")
+            raise RoExError("AI mastering requires exactly one finished track", "invalid_audio")
         readable_url = _upload(prepared[0])
         progress(35)
         _, created = _api_request(
             "/masteringpreview",
-            {
-                "masteringData": {
-                    "trackData": [{"trackURL": readable_url}],
-                    "musicalStyle": _style(job.get("prompt", "")),
-                    "desiredLoudness": "MEDIUM",
-                    "sampleRate": "44100",
-                }
-            },
+            {"masteringData": {"trackData": [{"trackURL": readable_url}], "musicalStyle": _style(prompt, "master"), "desiredLoudness": _loudness(prompt), "sampleRate": "44100"}},
         )
         task_id = created.get("mastering_task_id") or created.get("masteringTaskId")
         if not isinstance(task_id, str):
             raise RoExError("RoEx Tonn did not create a mastering task")
         progress(55)
-        url = _poll_result(
-            "/retrievepreviewmaster",
-            {"masteringData": {"masteringTaskId": task_id}},
-            "previewMasterTaskResults",
-            "download_url_mastered_preview",
+        url = _poll("/retrievepreviewmaster", {"masteringData": {"masteringTaskId": task_id}}, _preview_url("previewMasterTaskResults", "download_url_mastered_preview"))
+        provider_data = {"workflow": "master", "task_id": task_id}
+    elif workflow == "recombine":
+        beat_index = next(index for index, track in enumerate(job["tracks"]) if track["category"] == "beat")
+        vocal_index = 1 - beat_index
+        backing_url = _upload(prepared[beat_index])
+        vocal_url = _upload(prepared[vocal_index])
+        progress(35)
+        _, created = _api_request(
+            "/recombine",
+            {"recombineData": {"vocalStemURL": vocal_url, "backingStemURL": backing_url, "musicalStyle": _style(prompt, "recombine"), "desiredLoudness": _loudness(prompt), "vocalGainDb": _vocal_gain(prompt)}},
         )
+        task_id = created.get("recombineTaskId")
+        if not isinstance(task_id, str) or created.get("error"):
+            raise RoExError("RoEx Tonn did not create a vocal mix task")
+        progress(50)
+
+        def recombine_done(response: dict):
+            if _task_failed(response):
+                raise RoExError("RoEx Tonn could not mix this vocal and beat", "invalid_audio")
+            return str(response.get("status", "")).lower() == "complete"
+
+        _poll(f"/recombinestatus/{task_id}", None, recombine_done, method="GET")
+        progress(70)
+
+        def preview_ready(response: dict):
+            url = (response.get("preview") or {}).get("preview_url")
+            return url if isinstance(url, str) and url else None
+
+        url = _poll("/retrieverecombinepreview", {"recombineData": {"recombineTaskId": task_id}}, preview_ready)
+        provider_data = {"workflow": "recombine", "task_id": task_id}
     else:
         if not 2 <= len(prepared) <= 32:
-            raise RoExError("RoEx AI mixing needs 2 to 32 separate tracks")
+            raise RoExError("RoEx AI mixing needs 2 to 32 separate tracks", "invalid_audio")
         track_data = []
         for index, (source, track) in enumerate(zip(prepared, job["tracks"], strict=True)):
             readable_url = _upload(source)
@@ -253,31 +345,81 @@ def create_preview(job: dict, source_paths: list[Path], output_path: Path, progr
                     "instrumentGroup": group,
                     "presenceSetting": "LEAD" if category == "lead_vocal" else "BACKGROUND" if category in {"doubles", "backing_vocals", "adlibs"} else "NORMAL",
                     "panPreference": "CENTRE" if category in {"beat", "lead_vocal"} else "NO_PREFERENCE",
-                    "reverbPreference": _reverb(job.get("prompt", ""), category),
+                    "reverbPreference": _reverb(prompt, category),
                 }
             )
             progress(min(35, 10 + int(25 * (index + 1) / len(prepared))))
         _, created = _api_request(
             "/mixpreview",
-            {
-                "multitrackData": {
-                    "trackData": track_data,
-                    "musicalStyle": _style(job.get("prompt", "")),
-                    "returnStems": False,
-                    "sampleRate": 44100,
-                }
-            },
+            {"multitrackData": {"trackData": track_data, "musicalStyle": _style(prompt, "mix"), "returnStems": False, "sampleRate": 44100}},
         )
         task_id = created.get("multitrack_task_id") or created.get("multitrackTaskId")
         if not isinstance(task_id, str):
             raise RoExError("RoEx Tonn did not create a mixing task")
         progress(55)
-        url = _poll_result(
+        url = _poll(
             "/retrievepreviewmix",
             {"multitrackData": {"multitrackTaskId": task_id, "retrieveFXSettings": False}},
-            "previewMixTaskResults",
-            "download_url_preview_mixed",
+            _preview_url("previewMixTaskResults", "download_url_preview_mixed"),
         )
+        provider_data = {"workflow": "multitrack", "task_id": task_id, "track_urls": [item["trackURL"] for item in track_data], "loudness": _loudness(prompt)}
 
     progress(85)
-    return _download(url, output_path)
+    output, output_format = _download(url, workdir)
+    if workflow == "multitrack":
+        # RoEx multitrack mixes are not mastered; finish them to a release-like loudness locally.
+        output, output_format = finish_loudness(output, workdir / "roex-finished.wav", LOUDNESS_TARGET_LUFS[provider_data["loudness"]]), "wav"
+    return output, output_format, provider_data
+
+
+def create_full(provider_data: dict, workdir: Path, progress, remember) -> tuple[Path, str]:
+    """Render the full-length track for a completed preview. This spends RoEx credits once."""
+    url = provider_data.get("final_url")
+    workflow = provider_data.get("workflow")
+    task_id = provider_data.get("task_id")
+    if not isinstance(task_id, str) or workflow not in {"master", "recombine", "multitrack"}:
+        raise RoExError("This preview cannot be rendered at full length", "provider_failed")
+
+    if not url:
+        progress(15)
+        if workflow == "recombine":
+            def master_ready(response: dict):
+                result_url = (response.get("result") or {}).get("master_url")
+                return result_url if isinstance(result_url, str) and result_url else None
+
+            url = _poll("/retrieverecombine", {"recombineData": {"recombineTaskId": task_id}}, master_ready)
+        elif workflow == "master":
+            def final_master(response: dict):
+                result_url = response.get("finalMasterTaskResults")
+                return result_url if isinstance(result_url, str) and result_url else None
+
+            url = _poll("/retrievefinalmaster", {"masteringData": {"masteringTaskId": task_id}}, final_master)
+        else:
+            track_urls = provider_data.get("track_urls") or []
+            if len(track_urls) < 2:
+                raise RoExError("This preview is missing its RoEx track references", "provider_failed")
+
+            def final_mix(response: dict):
+                result_url = (response.get("applyAudioEffectsResults") or {}).get("download_url_mixed")
+                return result_url if isinstance(result_url, str) and result_url else None
+
+            url = _poll(
+                "/retrievefinalmix",
+                {"applyAudioEffectsData": {"multitrackTaskId": task_id, "trackData": [{"trackURL": track_url, "gainDb": 0} for track_url in track_urls], "returnStems": False, "sampleRate": "44100"}},
+                final_mix,
+            )
+        # Persist before downloading so a retry reuses the paid result instead of paying again.
+        remember({**provider_data, "final_url": url})
+
+    progress(70)
+    try:
+        output, output_format = _download(url, workdir)
+    except RoExError as error:
+        # RoEx signs result URLs for 24 hours. Recombine charges only on the first retrieval,
+        # so an expired saved link can be refreshed for free; other workflows stop here.
+        if error.code != "provider_expired" or workflow != "recombine" or not provider_data.get("final_url"):
+            raise
+        return create_full({key: value for key, value in provider_data.items() if key != "final_url"}, workdir, progress, remember)
+    if workflow == "multitrack":
+        output, output_format = finish_loudness(output, workdir / "roex-finished.wav", LOUDNESS_TARGET_LUFS.get(provider_data.get("loudness", "MEDIUM"), -11.0)), "wav"
+    return output, output_format
