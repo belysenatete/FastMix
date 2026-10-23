@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const questions = [
   ["Do I need mixing experience?", "No. Start with your tracks, then describe the sound you want in everyday language. The studio is designed to guide you through the process."],
@@ -17,8 +17,8 @@ const quotes = [
 ];
 
 const copy = {
-  en: { solution: "The studio", pricing: "Plans", faq: "FAQ", login: "Log in", start: "Open the studio", eyebrow: "A clearer way to finish your sound", titleA: "Make room for", titleB: "the music.", subtitle: "Bring your tracks, describe what you hear in your head, and shape a mix that feels like yours.", primary: "Start a session", secondary: "See how it works", proof: "A calmer workflow for independent artists", method: "Your sound, in three simple moves", studioTitle: "Less menu diving. More making.", studioText: "FastMix gives your tracks a home, your direction a place to live, and every new version a clear path forward.", reviews: "Made for artists finding their sound", pricingTitle: "Room to grow, without the guesswork", faqTitle: "A few things artists ask", final: "Your next mix starts with an idea.", finalButton: "Create your workspace", copyright: "An independent artist studio." },
-  fr: { solution: "Le studio", pricing: "Offres", faq: "FAQ", login: "Connexion", start: "Ouvrir le studio", eyebrow: "Une façon plus simple de finir votre son", titleA: "Faites place à", titleB: "la musique.", subtitle: "Ajoutez vos pistes, décrivez le son que vous imaginez et façonnez un mix qui vous ressemble.", primary: "Commencer une session", secondary: "Voir comment ça marche", proof: "Un flux de travail plus serein pour les artistes indépendants", method: "Votre son, en trois étapes simples", studioTitle: "Moins de menus. Plus de création.", studioText: "FastMix organise vos pistes, vos intentions et chaque nouvelle version dans un espace clair.", reviews: "Pensé pour les artistes en recherche de leur son", pricingTitle: "De la liberté pour avancer, sans surprise", faqTitle: "Les questions des artistes", final: "Votre prochain mix commence par une idée.", finalButton: "Créer votre espace", copyright: "Un studio pour les artistes indépendants." },
+  en: { solution: "The studio", pricing: "Plans", faq: "FAQ", login: "Log in", start: "Open the studio", eyebrow: "A clearer way to finish your sound", titleA: "Make room for", titleB: "the music.", subtitle: "Bring your tracks, describe what you hear in your head, and shape a mix that feels like yours.", primary: "Start a session", secondary: "See how it works", proof: "A calmer workflow for independent artists", method: "Your sound, in three simple moves", studioTitle: "Less menu diving. More making.", studioText: "FastMix gives your tracks a home, your direction a place to live, and every new version a clear path forward.", reviews: "Made for artists finding their sound", pricingTitle: "Room to grow, without the guesswork", faqTitle: "A few things artists ask", final: "Your next mix starts with an idea.", finalButton: "Create your workspace", copyright: "An independent artist studio.", listen: "Listen", listenKicker: "HEAR THE DIFFERENCE", listenTitle: "Same take. Same beat. A different mix.", listenText: "Switch between the raw tracks and the FastMix version while it plays.", before: "Before", after: "After", play: "Play", pause: "Pause", listenNote: "Demo made from original synthesized tracks with FastMix's local engine: vocal balance, autotune in A minor, reverb and loudness. Both versions are loudness-matched." },
+  fr: { solution: "Le studio", pricing: "Offres", faq: "FAQ", login: "Connexion", start: "Ouvrir le studio", eyebrow: "Une façon plus simple de finir votre son", titleA: "Faites place à", titleB: "la musique.", subtitle: "Ajoutez vos pistes, décrivez le son que vous imaginez et façonnez un mix qui vous ressemble.", primary: "Commencer une session", secondary: "Voir comment ça marche", proof: "Un flux de travail plus serein pour les artistes indépendants", method: "Votre son, en trois étapes simples", studioTitle: "Moins de menus. Plus de création.", studioText: "FastMix organise vos pistes, vos intentions et chaque nouvelle version dans un espace clair.", reviews: "Pensé pour les artistes en recherche de leur son", pricingTitle: "De la liberté pour avancer, sans surprise", faqTitle: "Les questions des artistes", final: "Votre prochain mix commence par une idée.", finalButton: "Créer votre espace", copyright: "Un studio pour les artistes indépendants.", listen: "Écouter", listenKicker: "ÉCOUTEZ LA DIFFÉRENCE", listenTitle: "Même prise. Même beat. Un autre mix.", listenText: "Passez des pistes brutes à la version FastMix pendant la lecture.", before: "Avant", after: "Après", play: "Lecture", pause: "Pause", listenNote: "Démo créée à partir de pistes synthétisées originales avec le moteur local de FastMix : équilibre de la voix, autotune en la mineur, réverbe et volume. Les deux versions ont le même niveau sonore." },
 };
 
 function Mark() {
@@ -29,13 +29,91 @@ function Waveform({ compact = false }: { compact?: boolean }) {
   return <div className={`waveform${compact ? " waveform-compact" : ""}`} aria-hidden="true">{Array.from({ length: compact ? 34 : 72 }, (_, i) => <i key={i} style={{ "--bar": `${Math.round(18 + Math.abs(Math.sin(i * 1.73)) * (compact ? 45 : 70))}%`, "--delay": `${(i % 9) * -0.13}s` } as React.CSSProperties} />)}</div>;
 }
 
+type Copy = (typeof copy)["en"];
+
+function formatTime(seconds: number) {
+  const whole = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+
+/** A/B player: both versions stay in sync so switching keeps the playback position. */
+function BeforeAfter({ t }: { t: Copy }) {
+  const before = useRef<HTMLAudioElement>(null);
+  const after = useRef<HTMLAudioElement>(null);
+  const [side, setSide] = useState<"before" | "after">("before");
+  const [playing, setPlaying] = useState(false);
+  const [time, setTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const active = () => (side === "before" ? before : after).current;
+
+  useEffect(() => {
+    // The browser can load metadata before hydration attaches onLoadedMetadata, so read it once on mount too.
+    const audio = before.current;
+    if (audio && audio.readyState >= 1) {
+      const known = audio.duration;
+      queueMicrotask(() => setDuration(known || 0));
+    }
+  }, []);
+
+  function choose(next: "before" | "after") {
+    if (next === side) return;
+    const from = active();
+    const to = (next === "before" ? before : after).current;
+    if (from && to) {
+      to.currentTime = from.currentTime;
+      if (playing) { from.pause(); void to.play(); }
+    }
+    setSide(next);
+  }
+
+  function toggle() {
+    const audio = active();
+    if (!audio) return;
+    if (playing) audio.pause(); else void audio.play();
+  }
+
+  const events = (name: "before" | "after") => ({
+    onPlay: () => { if (name === side) setPlaying(true); },
+    onPause: () => { if (name === side) setPlaying(false); },
+    onEnded: () => { if (name === side) { setPlaying(false); setTime(0); } },
+    onTimeUpdate: (event: React.SyntheticEvent<HTMLAudioElement>) => { if (name === side) setTime(event.currentTarget.currentTime); },
+    onDurationChange: (event: React.SyntheticEvent<HTMLAudioElement>) => { if (name === "before") setDuration(event.currentTarget.duration || 0); },
+  });
+
+  return <section className="section wrap listen-section" id="listen">
+    <div className="section-head"><span className="kicker">{t.listenKicker}</span><h2>{t.listenTitle}</h2><p>{t.listenText}</p></div>
+    <div className="ab-player">
+      <button className="ab-play" onClick={toggle} aria-label={playing ? t.pause : t.play}>{playing ? "❚❚" : "▶"}</button>
+      <div className="ab-body">
+        <div className="ab-switch" role="group" aria-label={`${t.before} / ${t.after}`}>
+          <button aria-pressed={side === "before"} onClick={() => choose("before")}>{t.before}</button>
+          <button aria-pressed={side === "after"} onClick={() => choose("after")}>{t.after}</button>
+        </div>
+        <div className="ab-progress" aria-hidden="true"><i style={{ width: `${duration ? (time / duration) * 100 : 0}%` }} /></div>
+        <span className="ab-time">{formatTime(time)} / {formatTime(duration)}</span>
+      </div>
+      <audio ref={before} src="/demo/mix-before.mp3" preload="metadata" {...events("before")} />
+      <audio ref={after} src="/demo/mix-after.mp3" preload="metadata" {...events("after")} />
+    </div>
+    <p className="ab-note">{t.listenNote}</p>
+  </section>;
+}
+
 export default function LandingPage() {
   const [locale, setLocale] = useState<"en" | "fr">("en");
   const [billing, setBilling] = useState<"monthly" | "lifetime">("monthly");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [quote, setQuote] = useState(0);
   const [showDemo, setShowDemo] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const t = copy[locale];
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [menuOpen]);
 
   return <main className="marketing-shell">
     <header className="site-nav wrap">
@@ -48,7 +126,12 @@ export default function LandingPage() {
         </div>
         <Link className="nav-login" href="/login">{t.login}</Link>
         <Link className="button button-small button-lime" href="/signup">{t.start}<span aria-hidden="true">↗</span></Link>
+        <button className="menu-toggle" aria-expanded={menuOpen} aria-controls="mobile-menu" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? "Close" : "Menu"}</button>
       </div>
+      {menuOpen && <nav id="mobile-menu" className="mobile-menu" aria-label="Mobile navigation" onClick={(event) => { if ((event.target as HTMLElement).closest("a")) setMenuOpen(false); }}>
+        <a href="#listen">{t.listen}</a><a href="#studio">{t.solution}</a><a href="#pricing">{t.pricing}</a><a href="#faq">{t.faq}</a><Link href="/login">{t.login}</Link>
+        <div className="locale-switch mobile-locale" role="group" aria-label="Language"><button aria-pressed={locale === "en"} onClick={() => setLocale("en")}>EN</button><button aria-pressed={locale === "fr"} onClick={() => setLocale("fr")}>FR</button></div>
+      </nav>}
     </header>
 
     <section className="hero wrap" id="top">
@@ -80,6 +163,8 @@ export default function LandingPage() {
       </div>
     </section>
 
+    <BeforeAfter t={t} />
+
     <section className="studio-feature" id="studio"><div className="wrap feature-layout"><div className="feature-copy"><span className="kicker">A STUDIO THAT GETS OUT OF THE WAY</span><h2>{t.studioTitle}</h2><p>{t.studioText}</p><ul><li><span>↗</span> Every track has a clear place</li><li><span>↗</span> Prompts you can shape as you listen</li><li><span>↗</span> Versions stay easy to find</li></ul><Link className="text-link" href="/signup">{t.start} <span>↗</span></Link></div><div className="studio-window"><div className="window-top"><div className="window-brand"><Mark /> fastmix</div><span>SESSION / AFTER THE RAIN</span><span className="window-dots">•••</span></div><div className="window-main"><div className="window-side"><span className="side-active">Mix session</span><span>My library</span><span>Sound guide</span><div className="side-avatar">JR <small>Jules Rivers</small></div></div><div className="window-content"><div className="window-title"><div><small>YOUR STUDIO / MIXING</small><h3>After the rain</h3></div><button>Save session</button></div><div className="window-tracks"><div className="window-track"><span className="track-icon">♫</span><div><b>Beat</b><small>rainy-evening.wav</small></div><Waveform compact /></div><div className="window-track"><span className="track-icon purple">♫</span><div><b>Lead vocals</b><small>verse-and-hook.wav</small></div><Waveform compact /></div><div className="window-track"><span className="track-icon blue">♫</span><div><b>Backing vocals</b><small>harmonies.wav</small></div><Waveform compact /></div></div><div className="window-prompt"><small>YOUR MIX DIRECTION</small><p>Keep the lead close and warm. Let the harmony open up in the hook.</p></div><div className="window-submit"><span><i className="live-dot" /> Draft saved</span><button>Shape this mix <b>↗</b></button></div></div></div></div></div></section>
 
     <section className="section wrap testimonials"><div className="testimonial-head"><div><span className="kicker">NOT A PRESET. A STARTING POINT.</span><h2>{t.reviews}</h2></div><div className="carousel-controls"><button aria-label="Previous quote" onClick={() => setQuote((quote + quotes.length - 1) % quotes.length)}>←</button><span>0{quote + 1} <i>/</i> 0{quotes.length}</span><button aria-label="Next quote" onClick={() => setQuote((quote + 1) % quotes.length)}>→</button></div></div><div className="quote-card"><div className="quote-glyph">“</div><blockquote>{quotes[quote].quote}</blockquote><div className="quote-person"><div className="quote-avatar">{quotes[quote].name[0]}</div><div><b>{quotes[quote].name}</b><small>{quotes[quote].role}</small></div><div className="quote-stars" aria-label="5 out of 5 stars">★★★★★</div></div></div></section>
@@ -92,6 +177,6 @@ export default function LandingPage() {
 
     <footer className="site-footer"><div className="wrap footer-main"><div className="footer-brand"><Link href="/" className="brand"><Mark /><span>fastmix<span className="brand-dot">.</span></span></Link><p>{t.copyright}<br />Make a little more room for the music.</p></div><div className="footer-col"><b>EXPLORE</b><a href="#studio">The studio</a><a href="#pricing">Plans</a><Link href="/faq">FAQ</Link></div><div className="footer-col"><b>YOUR SPACE</b><Link href="/login">Log in</Link><Link href="/signup">Create account</Link><Link href="/studio/guide">Sound guide</Link></div><div className="footer-col"><b>INFORMATION</b><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/cookies">Cookies</Link></div></div><div className="wrap footer-bottom"><span>© 2026 FastMix Studio</span><span>Made for the music you haven&apos;t finished yet.</span><div className="footer-locale"><button onClick={() => setLocale("en")}>EN</button><button onClick={() => setLocale("fr")}>FR</button></div></div></footer>
 
-    {showDemo && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowDemo(false); }}><section className="demo-modal" role="dialog" aria-modal="true" aria-labelledby="demo-title"><button className="modal-close" aria-label="Close demo" onClick={() => setShowDemo(false)}>×</button><span className="kicker">THE FASTMIX WORKFLOW</span><h2 id="demo-title">Three steps. Your sound.</h2><div className="demo-preview"><Mark /><Waveform /><span>PREVIEW TOUR</span></div><p>This preview shows the product flow. Audio examples will be added when licensed samples are ready.</p><button className="button button-lime" onClick={() => setShowDemo(false)}>Got it</button></section></div>}
+    {showDemo && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowDemo(false); }}><section className="demo-modal" role="dialog" aria-modal="true" aria-labelledby="demo-title"><button className="modal-close" aria-label="Close demo" onClick={() => setShowDemo(false)}>×</button><span className="kicker">THE FASTMIX WORKFLOW</span><h2 id="demo-title">Three steps. Your sound.</h2><div className="demo-preview"><Mark /><Waveform /><span>PREVIEW TOUR</span></div><p>Add your tracks, describe the sound, then refine each version with a short note. Hear a before/after example on this page.</p><a className="button button-lime" href="#listen" onClick={() => setShowDemo(false)}>Hear the difference</a></section></div>}
   </main>;
 }

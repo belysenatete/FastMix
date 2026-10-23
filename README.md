@@ -28,6 +28,8 @@ Every job starts with a free 30-second preview (free while the account has a pos
 
 **Refinement:** every version stores the settings that produced it (style, loudness, vocal level, vocal reverb, autotune), shown in the mixer and library. After a version finishes, type a note such as "vocal louder, more reverb", "harder autotune in A minor", "more dynamic" or "make it afro" to create a new version; earlier versions are kept. Notes are read by keyword (English and French), and a note with no recognizable change is rejected with examples rather than ignored. The local engine applies vocal level, a basic echo-style reverb, autotune and loudness, so refinements are audible even without RoEx.
 
+The landing page's before/after demo (`web/public/demo/`) is rendered from original synthesized tracks by `worker/scripts/make_demo_audio.py`; replace it with licensed real recordings when available. Regenerate it with `docker compose run --rm -v ./worker/scripts:/srv/fastmix/scripts:ro -v ./web/public/demo:/out --no-deps api python -m scripts.make_demo_audio /out` (in Git Bash, set `MSYS_NO_PATHCONV=1` first).
+
 Worker unit tests run inside the API image: `docker compose run --rm -v ./worker/tests:/srv/fastmix/tests:ro --no-deps api python -m unittest discover -s tests`.
 
 Audio uploads require the Compose API and private object storage. See `phases.md`, `projectDescription.md`, `projectTracker.md`, and `codingPrinciples.md` for product scope and implementation status.

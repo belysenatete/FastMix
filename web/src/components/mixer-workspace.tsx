@@ -156,7 +156,7 @@ export default function MixerWorkspace() {
       const createdJob = jobFromApi(body.job);
       setJob(createdJob);
       updateProject({ status: "queued" });
-      setNotice(createdJob.processor === "roex_tonn" ? "RoEx AI preview queued. Your audio will be sent to RoEx for processing; this requests a preview only." : "Local audio preview queued. This applies basic FFmpeg mixing and loudness normalization, not AI processing.");
+      setNotice(createdJob.processor === "roex_tonn" ? "RoEx AI preview queued. Your audio will be sent to RoEx for processing; this requests a preview only." : "Local preview queued. FastMix's basic engine applies your vocal level, reverb, autotune and loudness; AI mixing starts once RoEx is connected.");
     } catch (issue) {
       setNotice(issue instanceof Error ? issue.message : "The processor could not accept this session.");
     } finally { setJobPending(false); }
@@ -260,6 +260,7 @@ export default function MixerWorkspace() {
 
   async function deleteCurrentSession() {
     if (!project) return;
+    if (!window.confirm(`Delete “${project.title}” and its stored audio? This cannot be undone.`)) return;
     const deleted = await removeProject(project.id);
     if (!deleted) { setNotice("This session could not be removed. Wait for processing to finish and check local services."); return; }
     const remaining = await listProjects();
