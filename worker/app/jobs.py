@@ -22,6 +22,7 @@ def queue_client():
 @router.post("/{project_id}/jobs", status_code=202)
 def create_job(project_id: uuid.UUID, user_id: str = Depends(require_internal_app)):
     job_id = uuid.uuid4()
+    processor = "roex_tonn" if os.getenv("ROEX_ENABLED", "").strip().lower() == "true" else "ffmpeg_preview"
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
         find_owner(connection, user_id, project_id)
         project = connection.execute("SELECT id, prompt, project_type, status FROM projects WHERE id = %s FOR UPDATE", (project_id,)).fetchone()
@@ -32,11 +33,13 @@ def create_job(project_id: uuid.UUID, user_id: str = Depends(require_internal_ap
         tracks = connection.execute("SELECT count(*) AS total FROM tracks WHERE project_id = %s", (project_id,)).fetchone()["total"]
         if tracks < 1:
             raise HTTPException(status_code=400, detail="Add at least one audio track before processing")
+        if processor == "roex_tonn" and project["project_type"] != "master" and tracks < 2:
+            raise HTTPException(status_code=400, detail="AI mixing needs at least two separate tracks. Add another track or remove ROEX_API_KEY to use the local preview processor.")
         if project["project_type"] == "master" and tracks != 1:
             raise HTTPException(status_code=400, detail="A mastering preview needs exactly one finished track")
         job = connection.execute(
-            "INSERT INTO processing_jobs (id, project_id, status, progress, processor) VALUES (%s, %s, 'queued', 0, 'ffmpeg_preview') RETURNING id, project_id, status, progress, processor, attempt, created_at, updated_at",
-            (job_id, project_id),
+            "INSERT INTO processing_jobs (id, project_id, status, progress, processor) VALUES (%s, %s, 'queued', 0, %s) RETURNING id, project_id, status, progress, processor, attempt, created_at, updated_at",
+            (job_id, project_id, processor),
         ).fetchone()
         connection.execute("UPDATE projects SET status = 'queued', updated_at = now() WHERE id = %s", (project_id,))
     try:

@@ -4,7 +4,7 @@
 
 Build a web application inspired by the Easymix experience: an approachable online studio where artists can upload stems or a finished track, describe the sound they want, request AI-assisted mixing or mastering, and play or download the result. The product should support the public discovery and pricing journey as well as a signed-in workspace for sessions, saved mixes, account management, help, and subscriptions.
 
-Emulate the observed product capabilities and user flows, not Easymix's identity or private implementation. Use original product naming, visual assets, copy, and implementation. The inspected public pages and signed-in pages inform the feature scope. The actual audio processing result was not observed; that workflow must be designed and verified independently.
+Emulate the observed product capabilities and user flows, not Easymix's identity or private implementation. Use original product naming, visual assets, copy, and implementation. The inspected public pages and signed-in pages inform the feature scope. The actual Easymix audio processing engine was not publicly identified or observed; that workflow must be designed and verified independently. The current optional AI processing adapter uses RoEx Tonn for multitrack mix and mastering previews when `ROEX_API_KEY` is configured. Uploaded audio is sent to RoEx for processing. Without that key, the local FFmpeg preview path remains available.
 
 ## Feature scope to emulate
 

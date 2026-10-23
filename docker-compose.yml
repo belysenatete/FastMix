@@ -9,7 +9,7 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
       - ./database/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fastmix -d fastmix"]
@@ -31,7 +31,7 @@ services:
       retries: 10
 
   storage:
-    image: quay.io/minio/minio:latest
+    image: docker.io/pgsty/silo:RELEASE.2026-09-16T00-00-00Z
     command: server /data --console-address ":9001"
     restart: unless-stopped
     environment:
@@ -44,7 +44,7 @@ services:
       - audio_data:/data
 
   storage-init:
-    image: minio/mc:latest
+    image: docker.io/pgsty/mc:RELEASE.2026-09-16T00-00-00Z
     depends_on:
       - storage
     entrypoint: >-
@@ -80,6 +80,7 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-fastmix_storage_dev_only}
       S3_BUCKET: ${S3_BUCKET:-fastmix-audio}
       S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
+      ROEX_ENABLED: ${ROEX_API_KEY:+true}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -105,6 +106,7 @@ services:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-fastmix_dev}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-fastmix_storage_dev_only}
       S3_BUCKET: ${S3_BUCKET:-fastmix-audio}
+      ROEX_API_KEY: ${ROEX_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy

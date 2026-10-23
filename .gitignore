@@ -1,6 +1,7 @@
 # Local secrets and credentials maintained outside version control.
 /credentials.md
 /.playwright-mcp/
+/.tmp/
 /.venv/
 __pycache__/
 *.py[cod]

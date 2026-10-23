@@ -14,6 +14,7 @@ from psycopg.rows import dict_row
 
 from .jobs import QUEUE_NAME
 from .uploads import database_url
+from .roex import create_preview as create_roex_preview
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("fastmix.processor")
@@ -61,18 +62,25 @@ def mark_failed(job_id: uuid.UUID, project_id: uuid.UUID):
 def claim_job(job_id: uuid.UUID):
     with db_connection() as connection:
         job = connection.execute(
-            "UPDATE processing_jobs SET status = 'processing', progress = 3, updated_at = now() WHERE id = %s AND status = 'queued' RETURNING id, project_id",
+            "UPDATE processing_jobs SET status = 'processing', progress = 3, updated_at = now() WHERE id = %s AND status = 'queued' RETURNING id, project_id, processor",
             (job_id,),
         ).fetchone()
         if not job:
             return None
         connection.execute("UPDATE projects SET status = 'processing', updated_at = now() WHERE id = %s", (job["project_id"],))
-        project = connection.execute("SELECT project_type FROM projects WHERE id = %s", (job["project_id"],)).fetchone()
+        project = connection.execute("SELECT project_type, prompt FROM projects WHERE id = %s", (job["project_id"],)).fetchone()
         tracks = connection.execute(
             "SELECT id, storage_key, category, original_name FROM tracks WHERE project_id = %s ORDER BY created_at ASC",
             (job["project_id"],),
         ).fetchall()
-    return {"id": job["id"], "project_id": job["project_id"], "project_type": project["project_type"], "tracks": tracks}
+    return {
+        "id": job["id"],
+        "project_id": job["project_id"],
+        "project_type": project["project_type"],
+        "prompt": project["prompt"],
+        "processor": job["processor"],
+        "tracks": tracks,
+    }
 
 
 def process_job(job_id: uuid.UUID):
@@ -94,30 +102,43 @@ def process_job(job_id: uuid.UUID):
                 source_paths.append(target)
             update_job(job_id, 42)
 
+            output_format = "wav"
             output_path = Path(temp_dir) / "fastmix-preview.wav"
-            command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y"]
-            for path in source_paths:
-                command.extend(["-i", str(path)])
-            count = len(source_paths)
-            input_labels = "".join(f"[{index}:a]" for index in range(count))
-            mix = f"amix=inputs={count}:duration=longest:dropout_transition=2" if count > 1 else "anull"
-            graph = f"{input_labels}{mix},loudnorm=I=-14:LRA=11:TP=-1.5[out]"
-            command.extend(["-filter_complex", graph, "-map", "[out]", "-ar", "48000", "-c:a", "pcm_s24le", str(output_path)])
-            subprocess.run(command, check=True, timeout=600, capture_output=True)
-            update_job(job_id, 82)
+            if job["processor"] == "roex_tonn":
+                output_path = Path(temp_dir) / "fastmix-preview.audio"
+                output_format = create_roex_preview(
+                    job,
+                    source_paths,
+                    output_path,
+                    lambda progress: update_job(job_id, progress),
+                )
+                output_path = output_path.with_suffix(f".{output_format}")
+                output_path.with_suffix(".audio").replace(output_path)
+            else:
+                command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y"]
+                for path in source_paths:
+                    command.extend(["-i", str(path)])
+                count = len(source_paths)
+                input_labels = "".join(f"[{index}:a]" for index in range(count))
+                mix = f"amix=inputs={count}:duration=longest:dropout_transition=2" if count > 1 else "anull"
+                graph = f"{input_labels}{mix},loudnorm=I=-14:LRA=11:TP=-1.5[out]"
+                command.extend(["-filter_complex", graph, "-map", "[out]", "-ar", "48000", "-c:a", "pcm_s24le", str(output_path)])
+                subprocess.run(command, check=True, timeout=600, capture_output=True)
+                update_job(job_id, 82)
 
-            output_key = f"projects/{job['project_id']}/jobs/{job_id}/fastmix-preview.wav"
+            content_types = {"wav": "audio/wav", "mp3": "audio/mpeg", "flac": "audio/flac"}
+            output_key = f"projects/{job['project_id']}/jobs/{job_id}/fastmix-preview.{output_format}"
             with output_path.open("rb") as audio:
-                client.upload_fileobj(audio, bucket, output_key, ExtraArgs={"ContentType": "audio/wav"})
+                client.upload_fileobj(audio, bucket, output_key, ExtraArgs={"ContentType": content_types[output_format]})
             size = output_path.stat().st_size
             with db_connection() as connection:
                 connection.execute(
-                    "INSERT INTO outputs (job_id, storage_key, format, size_bytes) VALUES (%s, %s, 'wav', %s) ON CONFLICT (job_id) DO UPDATE SET storage_key = EXCLUDED.storage_key, format = EXCLUDED.format, size_bytes = EXCLUDED.size_bytes, created_at = now()",
-                    (job_id, output_key, size),
+                    "INSERT INTO outputs (job_id, storage_key, format, size_bytes) VALUES (%s, %s, %s, %s) ON CONFLICT (job_id) DO UPDATE SET storage_key = EXCLUDED.storage_key, format = EXCLUDED.format, size_bytes = EXCLUDED.size_bytes, created_at = now()",
+                    (job_id, output_key, output_format, size),
                 )
                 connection.execute("UPDATE processing_jobs SET status = 'completed', progress = 100, error_code = NULL, updated_at = now() WHERE id = %s", (job_id,))
                 connection.execute("UPDATE projects SET status = 'completed', updated_at = now() WHERE id = %s", (job["project_id"],))
-        logger.info("Completed local preview job %s", job_id)
+        logger.info("Completed %s preview job %s", job["processor"], job_id)
     except Exception:
         mark_failed(job_id, job["project_id"])
         logger.exception("Local preview processing failed for job %s", job_id)
