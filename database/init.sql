@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS processing_jobs (
   render TEXT NOT NULL DEFAULT 'preview' CHECK (render IN ('preview', 'full')),
   source_job_id UUID REFERENCES processing_jobs(id) ON DELETE CASCADE,
   provider_data JSONB,
+  settings JSONB,
+  refinement TEXT CHECK (char_length(refinement) <= 500),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

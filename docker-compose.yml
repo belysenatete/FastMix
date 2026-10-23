@@ -65,7 +65,7 @@ services:
     volumes:
       - ./database/migrations:/migrations:ro
     entrypoint: >-
-      /bin/sh -c 'psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/002_job_indexes.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/003_clerk_identity.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/004_full_renders.sql'
+      /bin/sh -c 'psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/002_job_indexes.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/003_clerk_identity.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/004_full_renders.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/005_version_settings.sql'
 
   api:
     build: ./worker

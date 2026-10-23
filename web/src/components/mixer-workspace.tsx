@@ -14,8 +14,9 @@ const categories: Array<{ id: TrackCategory; name: string; detail: string; icon:
   { id: "master", name: "Finished track", detail: "One mix for loudness normalization", icon: "◉" },
 ];
 
-type JobItem = { id: string; status: string; progress: number; processor: string; attempt: number; render: "preview" | "full"; error_code?: string | null; output_format?: string | null; output_size_bytes?: number | null };
-function jobFromApi(row: Record<string, unknown>): JobItem { return { id: String(row.id), status: String(row.status), progress: Number(row.progress || 0), processor: String(row.processor || "ffmpeg_preview"), attempt: Number(row.attempt || 0), render: row.render === "full" ? "full" : "preview", error_code: typeof row.error_code === "string" ? row.error_code : null, output_format: typeof row.output_format === "string" ? row.output_format : null, output_size_bytes: typeof row.output_size_bytes === "number" ? row.output_size_bytes : null }; }
+type JobItem = { id: string; status: string; progress: number; processor: string; attempt: number; render: "preview" | "full"; summary: string | null; refinement: string | null; error_code?: string | null; output_format?: string | null; output_size_bytes?: number | null };
+const optionalText = (value: unknown) => typeof value === "string" ? value : null;
+function jobFromApi(row: Record<string, unknown>): JobItem { return { id: String(row.id), status: String(row.status), progress: Number(row.progress || 0), processor: String(row.processor || "ffmpeg_preview"), attempt: Number(row.attempt || 0), render: row.render === "full" ? "full" : "preview", summary: optionalText(row.summary), refinement: optionalText(row.refinement), error_code: optionalText(row.error_code), output_format: optionalText(row.output_format), output_size_bytes: typeof row.output_size_bytes === "number" ? row.output_size_bytes : null }; }
 
 function formatBytes(bytes: number) { return bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`; }
 
@@ -28,9 +29,18 @@ const failureMessages: Record<string, string> = {
   queue_unavailable: "The processing queue was unavailable. Retry in a moment.",
 };
 
-type JobPanelProps = { job: JobItem; projectType: "mix" | "master"; title: string; outputUrl: string | null; outputPending: boolean; jobPending: boolean; onPlay: () => void; onDownload: () => void; onRetry: () => void; onFullTrack: () => void };
+type JobPanelProps = { job: JobItem; projectType: "mix" | "master"; title: string; outputUrl: string | null; outputPending: boolean; jobPending: boolean; onPlay: () => void; onDownload: () => void; onRetry: () => void; onFullTrack: () => void; onRefine: (note: string) => Promise<boolean> };
 
-function JobPanel({ job, projectType, title, outputUrl, outputPending, jobPending, onPlay, onDownload, onRetry, onFullTrack }: JobPanelProps) {
+function RefineForm({ disabled, onRefine }: { disabled: boolean; onRefine: (note: string) => Promise<boolean> }) {
+  const [note, setNote] = useState("");
+  return <form className="refine-form" onSubmit={(event) => { event.preventDefault(); void onRefine(note.trim()).then((created) => { if (created) setNote(""); }); }}>
+    <label htmlFor="refine-note">What should change in the next version?</label>
+    <div><input id="refine-note" value={note} maxLength={500} onChange={(event) => setNote(event.target.value)} placeholder="Vocal louder, more reverb, harder autotune, more punch…" /><button type="submit" className="job-action job-action-primary" disabled={disabled || !note.trim()}>New version <span>↗</span></button></div>
+    <small>Earlier versions stay in your library.</small>
+  </form>;
+}
+
+function JobPanel({ job, projectType, title, outputUrl, outputPending, jobPending, onPlay, onDownload, onRetry, onFullTrack, onRefine }: JobPanelProps) {
   const ai = job.processor === "roex_tonn";
   const full = job.render === "full";
   const active = job.status === "queued" || job.status === "processing";
@@ -40,11 +50,12 @@ function JobPanel({ job, projectType, title, outputUrl, outputPending, jobPendin
     : job.status === "completed" ? ai ? `AI ${kind} preview ready` : "Local audio preview ready" : job.status === "failed" ? "Preview processing failed" : job.status === "queued" ? "In the preview queue" : "Shaping your preview";
   const completedText = full
     ? "Your full-length track is ready to play and download."
-    : ai ? "This is a 30-second AI preview. When it sounds right, get the full-length track; it uses RoEx credits (about $2–2.50) once for this version." : "This is a basic normalized audio preview. It is not AI mixing or mastering.";
+    : ai ? "This is a 30-second AI preview. When it sounds right, get the full-length track; it uses RoEx credits (about $2–2.50) once for this version." : "Local preview: FastMix's basic engine applied your vocal level, reverb, autotune and loudness. AI mixing starts once RoEx is connected.";
   return <div className={`job-panel job-${job.status}`} aria-live="polite">
     <div className="job-panel-top"><div><span className="job-indicator" /><b>{heading}</b></div><span className="job-processor">{ai ? full ? "ROEX AI · FULL TRACK" : "ROEX AI PREVIEW" : "FFMPEG PREVIEW"}</span></div>
+    {(job.refinement || job.summary) && <p className="job-settings">{job.refinement && <>Your note: “{job.refinement}”<br /></>}{job.summary && <>Settings: {job.summary}</>}</p>}
     {active ? <><div className="job-progress-track"><i style={{ width: `${Math.max(4, job.progress)}%` }} /></div><p>{job.status === "queued" ? "Waiting for the processor…" : `Processing your audio · ${job.progress}%`}</p></>
-      : job.status === "completed" ? <><p>{completedText}</p><div className="job-actions"><button className="job-action" disabled={outputPending} onClick={onPlay}>{outputPending ? "Preparing playback…" : full ? "Play full track" : "Play preview"}</button><button className="job-action" onClick={onDownload}>Download {job.output_format?.toUpperCase() || "WAV"} <span>↓</span></button>{ai && !full && <button className="job-action job-action-primary" disabled={jobPending} onClick={onFullTrack}>Get full track <span>↗</span></button>}</div>{outputUrl && <audio className="version-audio" controls preload="none" src={outputUrl} aria-label={`Play ${full ? "full track" : "preview"} for ${title}`} />}</>
+      : job.status === "completed" ? <><p>{completedText}</p><div className="job-actions"><button className="job-action" disabled={outputPending} onClick={onPlay}>{outputPending ? "Preparing playback…" : full ? "Play full track" : "Play preview"}</button><button className="job-action" onClick={onDownload}>Download {job.output_format?.toUpperCase() || "WAV"} <span>↓</span></button>{ai && !full && <button className="job-action job-action-primary" disabled={jobPending} onClick={onFullTrack}>Get full track <span>↗</span></button>}</div>{outputUrl && <audio className="version-audio" controls preload="none" src={outputUrl} aria-label={`Play ${full ? "full track" : "preview"} for ${title}`} />}{projectType === "mix" && <RefineForm disabled={jobPending} onRefine={onRefine} />}</>
       : <><p>{failureMessages[job.error_code || ""] || "Processing could not be completed. Check the audio format and processor setup, then retry."}</p><button className="job-action" disabled={jobPending} onClick={onRetry}>Retry <span>↻</span></button></>}
   </div>;
 }
@@ -148,6 +159,28 @@ export default function MixerWorkspace() {
       setNotice(createdJob.processor === "roex_tonn" ? "RoEx AI preview queued. Your audio will be sent to RoEx for processing; this requests a preview only." : "Local audio preview queued. This applies basic FFmpeg mixing and loudness normalization, not AI processing.");
     } catch (issue) {
       setNotice(issue instanceof Error ? issue.message : "The processor could not accept this session.");
+    } finally { setJobPending(false); }
+  }
+
+  async function refineVersion(note: string) {
+    if (!project || !job || job.status !== "completed" || !note) return false;
+    setJobPending(true);
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(project.id)}/jobs/${encodeURIComponent(job.id)}/refine`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note }),
+      });
+      const body = await response.json().catch(() => ({})) as { job?: Record<string, unknown>; changes?: string[]; detail?: unknown; error?: string };
+      if (!response.ok || !body.job) throw new Error(typeof body.detail === "string" ? body.detail : body.error || "The new version could not be created.");
+      setJob(jobFromApi(body.job));
+      setOutputUrl(null);
+      updateProject({ status: "queued" });
+      setNotice(`New version queued: ${(body.changes || []).join(", ")}.`);
+      return true;
+    } catch (issue) {
+      setNotice(issue instanceof Error ? issue.message : "The new version could not be created.");
+      return false;
     } finally { setJobPending(false); }
   }
 
@@ -265,7 +298,7 @@ export default function MixerWorkspace() {
         <div className="tracks-heading"><div><h2>{project.projectType === "master" ? "Finished track" : "Your tracks"} <span>{project.tracks.length.toString().padStart(2,"0")}</span></h2><p>{project.projectType === "master" ? "Master preview accepts one finished audio file." : "Keep each part on its own track for more control."}</p></div><div className="track-add-wrap"><button className="studio-button studio-button-lime" disabled={uploading} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{uploading ? "Uploading…" : "＋ Add a track"}</button>{menuOpen && <div className="track-type-menu" role="menu"><div className="track-menu-title">ADD A TRACK</div>{categoryOptions.map((item) => <button key={item.id} role="menuitem" onClick={() => chooseCategory(item.id)}><span className="category-icon">{item.icon}</span><span><b>{item.name}</b><small>{item.detail}</small></span><span className="category-plus">＋</span></button>)}</div>}</div><input ref={inputRef} className="visually-hidden" type="file" accept="audio/*,.wav,.mp3,.flac,.aiff,.aif,.m4a,.ogg" onChange={addTrack} aria-label={`Choose ${category} audio file`} /></div>
         {project.tracks.length === 0 ? <div className="empty-tracks"><div className="empty-track-icon">♫</div><b>Your session starts with a track</b><p>Add a beat, a vocal, or one instrument to see how it fits.</p><button className="empty-add" onClick={() => setMenuOpen(true)}>＋ Choose track type</button></div> : <div className="track-list">{project.tracks.map((track) => { const categoryName = categories.find((item) => item.id === track.category)?.name || "Track"; return <article className="track-row" key={track.id}><div className={`track-type-icon type-${track.category}`}>{categories.find((item) => item.id === track.category)?.icon}</div><div className="track-file-info"><b>{categoryName}</b><span title={track.name}>{track.name}</span></div><div className="track-meter" aria-hidden="true">{Array.from({length:36},(_,i)=><i key={i} style={{height:`${15 + Math.abs(Math.sin(i*1.81 + track.name.length))*68}%`}} />)}</div><span className="track-file-size">{formatBytes(track.sizeBytes)}</span><button className="track-remove" aria-label={`Remove ${track.name}`} onClick={() => removeTrack(track.id)}>×</button></article>; })}<button className="add-another" onClick={() => setMenuOpen(true)}>＋ Add another track</button></div>}
         <div className="direction-block"><div className="direction-heading"><div><label htmlFor="mix-direction">{project.projectType === "master" ? "YOUR MASTER DIRECTION" : "YOUR MIX DIRECTION"}</label><p>Use your own words. Be as specific or as open as you like.</p></div><button onClick={() => updateProject({ prompt: "" })} disabled={!project.prompt}>Clear</button></div><textarea id="mix-direction" maxLength={4000} value={project.prompt} onChange={(event) => updateProject({ prompt: event.target.value })} placeholder="A warm, close vocal with a little space on the ends of each line. Keep the beat punchy but let the hook breathe…" /><div className="prompt-footer"><span>Try describing the mood, vocal feel, effects, or energy.</span><span>{wordCount}/4000</span></div></div>
-        {job && <JobPanel job={job} projectType={project.projectType} title={project.title} outputUrl={outputUrl} outputPending={outputPending} jobPending={jobPending} onPlay={() => void playOutput()} onDownload={downloadOutput} onRetry={() => void startProcessing(true)} onFullTrack={() => void requestFullTrack()} />}
+        {job && <JobPanel job={job} projectType={project.projectType} title={project.title} outputUrl={outputUrl} outputPending={outputPending} jobPending={jobPending} onPlay={() => void playOutput()} onDownload={downloadOutput} onRetry={() => void startProcessing(true)} onFullTrack={() => void requestFullTrack()} onRefine={refineVersion} />}
         <div className="mix-action-row"><div className="mix-readiness"><span className={ready ? "readiness-ready" : "readiness-waiting"}>{ready ? "● Ready for a direction" : "○ Add tracks and a direction"}</span><small>Name a style (trap, drill, afro, reggaeton, pop…), autotune (subtle or hard, optionally with the key), the vocal level, reverb and loudness. FastMix turns them into AI mix settings and starts with a free 30-second preview.</small></div><button className={`studio-button ${ready && !busy ? "studio-button-lime" : "studio-button-disabled"}`} disabled={!ready || busy || uploading} onClick={() => void startProcessing()}>{jobPending ? "Queueing…" : project.projectType === "master" ? "Create master preview" : "Create audio preview"} <span>↗</span></button></div>
       </section>
       <aside className="mixer-aside"><div className="aside-card sound-card"><span className="studio-kicker">A GOOD PLACE TO START</span><h3>Find the words<br/>for your sound.</h3><p>Not sure how to describe it? Browse prompt ideas for a starting point.</p><Link href="/studio/guide" className="aside-link">Explore the sound guide <span>↗</span></Link><div className="sound-card-orbit"><span>FM</span></div></div><div className="aside-card tips-card"><span className="aside-tip-icon">✳</span><h3>A small recording tip</h3><p>Give each vocal take its own file, and start with the cleanest recording you have.</p></div><button className="delete-session" onClick={deleteCurrentSession}>Delete this session</button></aside>

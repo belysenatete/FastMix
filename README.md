@@ -26,6 +26,8 @@ Every job starts with a free 30-second preview (free while the account has a pos
 
 **Autotune** runs locally in the worker (no RoEx credits) whenever a mix direction asks for it, before either engine processes the vocals. "subtle/natural" applies light correction, "hard/robotic" gives the locked effect, and a key such as "in A minor" or "en la mineur" keeps notes in that scale; "no autotune" turns it off. It uses Praat's PSOLA through `praat-parselmouth` (GPL-3.0, used server-side only) and takes about 20 seconds per 3-minute vocal.
 
+**Refinement:** every version stores the settings that produced it (style, loudness, vocal level, vocal reverb, autotune), shown in the mixer and library. After a version finishes, type a note such as "vocal louder, more reverb", "harder autotune in A minor", "more dynamic" or "make it afro" to create a new version; earlier versions are kept. Notes are read by keyword (English and French), and a note with no recognizable change is rejected with examples rather than ignored. The local engine applies vocal level, a basic echo-style reverb, autotune and loudness, so refinements are audible even without RoEx.
+
 Worker unit tests run inside the API image: `docker compose run --rm -v ./worker/tests:/srv/fastmix/tests:ro --no-deps api python -m unittest discover -s tests`.
 
 Audio uploads require the Compose API and private object storage. See `phases.md`, `projectDescription.md`, `projectTracker.md`, and `codingPrinciples.md` for product scope and implementation status.

@@ -5,11 +5,27 @@ import psycopg
 import redis
 from fastapi import APIRouter, Depends, HTTPException, Query
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
+from pydantic import BaseModel, Field
 
+from .direction import describe, refine, settings_from_prompt
 from .uploads import database_url, find_owner, require_internal_app, storage_client
 
 router = APIRouter(prefix="/api/projects", tags=["jobs"])
 QUEUE_NAME = "fastmix:jobs"
+JOB_SELECT = (
+    "SELECT j.id, j.project_id, j.status, j.progress, j.processor, j.attempt, j.error_code, j.render, j.source_job_id, "
+    "j.settings, j.refinement, j.created_at, j.updated_at, o.format AS output_format, o.size_bytes AS output_size_bytes "
+    "FROM processing_jobs j LEFT JOIN outputs o ON o.job_id = j.id"
+)
+REFINE_HELP = (
+    "FastMix couldn't find a change in that note. Try things like \"vocal louder\", \"more reverb\", "
+    "\"less autotune\", \"harder autotune in A minor\", \"louder\", \"more dynamic\" or a style such as \"make it drill\"."
+)
+
+
+class RefineRequest(BaseModel):
+    note: str = Field(min_length=1, max_length=500)
 
 
 def queue_client():
@@ -30,31 +46,85 @@ def enqueue(job_id: uuid.UUID, project_id: uuid.UUID):
         raise HTTPException(status_code=503, detail="The preview processor is unavailable. Please retry shortly.") from error
 
 
+def present(job: dict) -> dict:
+    return {**job, "summary": describe(job["settings"])}
+
+
+def fetch_job(connection, project_id: uuid.UUID, job_id: uuid.UUID) -> dict | None:
+    job = connection.execute(f"{JOB_SELECT} WHERE j.project_id = %s AND j.id = %s", (project_id, job_id)).fetchone()
+    return present(job) if job else None
+
+
+def current_processor() -> str:
+    return "roex_tonn" if os.getenv("ROEX_ENABLED", "").strip().lower() == "true" else "ffmpeg_preview"
+
+
+def lock_ready_project(connection, project_id: uuid.UUID, processor: str) -> dict:
+    """Lock the project and check it can start a new preview version with this processor."""
+    project = connection.execute("SELECT id, prompt, project_type, status FROM projects WHERE id = %s FOR UPDATE", (project_id,)).fetchone()
+    if not project or not project["prompt"].strip():
+        raise HTTPException(status_code=400, detail="Add a mix direction before processing")
+    if connection.execute("SELECT 1 FROM processing_jobs WHERE project_id = %s AND status IN ('queued', 'processing') LIMIT 1", (project_id,)).fetchone():
+        raise HTTPException(status_code=409, detail="A session job is already in progress")
+    tracks = connection.execute("SELECT count(*) AS total FROM tracks WHERE project_id = %s", (project_id,)).fetchone()["total"]
+    if tracks < 1:
+        raise HTTPException(status_code=400, detail="Add at least one audio track before processing")
+    if processor == "roex_tonn" and project["project_type"] != "master" and tracks < 2:
+        raise HTTPException(status_code=400, detail="AI mixing needs at least two separate tracks. Add another track or remove ROEX_API_KEY to use the local preview processor.")
+    if project["project_type"] == "master" and tracks != 1:
+        raise HTTPException(status_code=400, detail="A mastering preview needs exactly one finished track")
+    return project
+
+
+def insert_preview(connection, project_id: uuid.UUID, processor: str, settings: dict, refinement: str | None = None) -> uuid.UUID:
+    job_id = uuid.uuid4()
+    connection.execute(
+        "INSERT INTO processing_jobs (id, project_id, status, progress, processor, settings, refinement) VALUES (%s, %s, 'queued', 0, %s, %s, %s)",
+        (job_id, project_id, processor, Jsonb(settings), refinement),
+    )
+    connection.execute("UPDATE projects SET status = 'queued', updated_at = now() WHERE id = %s", (project_id,))
+    return job_id
+
+
 @router.post("/{project_id}/jobs", status_code=202)
 def create_job(project_id: uuid.UUID, user_id: str = Depends(require_internal_app)):
-    job_id = uuid.uuid4()
-    processor = "roex_tonn" if os.getenv("ROEX_ENABLED", "").strip().lower() == "true" else "ffmpeg_preview"
+    processor = current_processor()
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
         find_owner(connection, user_id, project_id)
-        project = connection.execute("SELECT id, prompt, project_type, status FROM projects WHERE id = %s FOR UPDATE", (project_id,)).fetchone()
-        if not project or not project["prompt"].strip():
-            raise HTTPException(status_code=400, detail="Add a mix direction before processing")
-        if project["status"] in {"queued", "processing"}:
-            raise HTTPException(status_code=409, detail="A session job is already in progress")
-        tracks = connection.execute("SELECT count(*) AS total FROM tracks WHERE project_id = %s", (project_id,)).fetchone()["total"]
-        if tracks < 1:
-            raise HTTPException(status_code=400, detail="Add at least one audio track before processing")
-        if processor == "roex_tonn" and project["project_type"] != "master" and tracks < 2:
-            raise HTTPException(status_code=400, detail="AI mixing needs at least two separate tracks. Add another track or remove ROEX_API_KEY to use the local preview processor.")
-        if project["project_type"] == "master" and tracks != 1:
-            raise HTTPException(status_code=400, detail="A mastering preview needs exactly one finished track")
-        job = connection.execute(
-            "INSERT INTO processing_jobs (id, project_id, status, progress, processor) VALUES (%s, %s, 'queued', 0, %s) RETURNING id, project_id, status, progress, processor, attempt, render, source_job_id, created_at, updated_at",
-            (job_id, project_id, processor),
-        ).fetchone()
-        connection.execute("UPDATE projects SET status = 'queued', updated_at = now() WHERE id = %s", (project_id,))
+        project = lock_ready_project(connection, project_id, processor)
+        job_id = insert_preview(connection, project_id, processor, settings_from_prompt(project["prompt"]))
+        job = fetch_job(connection, project_id, job_id)
     enqueue(job_id, project_id)
     return {"job": job}
+
+
+@router.post("/{project_id}/jobs/{job_id}/refine", status_code=202)
+def refine_job(project_id: uuid.UUID, job_id: uuid.UUID, request: RefineRequest, user_id: str = Depends(require_internal_app)):
+    """Create a new preview version from a finished one, adjusted by the artist's note."""
+    note = request.note.strip()
+    if not note:
+        raise HTTPException(status_code=422, detail="Describe what should change in the next version")
+    processor = current_processor()
+    with psycopg.connect(database_url(), row_factory=dict_row) as connection:
+        find_owner(connection, user_id, project_id)
+        project = lock_ready_project(connection, project_id, processor)
+        source = connection.execute(
+            "SELECT j.status, j.settings, s.settings AS source_settings FROM processing_jobs j LEFT JOIN processing_jobs s ON s.id = j.source_job_id WHERE j.id = %s AND j.project_id = %s",
+            (job_id, project_id),
+        ).fetchone()
+        if not source:
+            raise HTTPException(status_code=404, detail="Processing job not found")
+        if source["status"] != "completed":
+            raise HTTPException(status_code=409, detail="Only a finished version can be refined")
+        # Full renders inherit their preview's settings; versions made before settings existed use the direction.
+        base = source["settings"] or source["source_settings"] or settings_from_prompt(project["prompt"])
+        settings, changes = refine(base, note)
+        if not changes:
+            raise HTTPException(status_code=422, detail=REFINE_HELP)
+        new_job_id = insert_preview(connection, project_id, processor, settings, note)
+        job = fetch_job(connection, project_id, new_job_id)
+    enqueue(new_job_id, project_id)
+    return {"job": job, "changes": changes}
 
 
 @router.post("/{project_id}/jobs/{job_id}/full", status_code=202)
@@ -65,26 +135,24 @@ def create_full_render(project_id: uuid.UUID, job_id: uuid.UUID, user_id: str = 
         find_owner(connection, user_id, project_id)
         connection.execute("SELECT id FROM projects WHERE id = %s FOR UPDATE", (project_id,))
         source = connection.execute(
-            "SELECT id, status, processor, render, provider_data FROM processing_jobs WHERE id = %s AND project_id = %s",
+            "SELECT id, status, processor, render, provider_data, settings FROM processing_jobs WHERE id = %s AND project_id = %s",
             (job_id, project_id),
         ).fetchone()
         if not source:
             raise HTTPException(status_code=404, detail="Processing job not found")
         if source["render"] != "preview" or source["processor"] != "roex_tonn" or source["status"] != "completed" or not source["provider_data"]:
             raise HTTPException(status_code=409, detail="Only a completed AI preview can be rendered as a full track")
-        existing = connection.execute(
-            "SELECT j.id, j.project_id, j.status, j.progress, j.processor, j.attempt, j.error_code, j.render, j.source_job_id, j.created_at, j.updated_at, o.format AS output_format, o.size_bytes AS output_size_bytes FROM processing_jobs j LEFT JOIN outputs o ON o.job_id = j.id WHERE j.source_job_id = %s AND j.render = 'full'",
-            (job_id,),
-        ).fetchone()
+        existing = connection.execute(f"{JOB_SELECT} WHERE j.source_job_id = %s AND j.render = 'full'", (job_id,)).fetchone()
         if existing:
-            return {"job": existing}
+            return {"job": present(existing)}
         if connection.execute("SELECT 1 FROM processing_jobs WHERE project_id = %s AND status IN ('queued', 'processing') LIMIT 1", (project_id,)).fetchone():
             raise HTTPException(status_code=409, detail="A session job is already in progress")
-        job = connection.execute(
-            "INSERT INTO processing_jobs (id, project_id, status, progress, processor, render, source_job_id) VALUES (%s, %s, 'queued', 0, 'roex_tonn', 'full', %s) RETURNING id, project_id, status, progress, processor, attempt, render, source_job_id, created_at, updated_at",
-            (full_job_id, project_id, job_id),
-        ).fetchone()
+        connection.execute(
+            "INSERT INTO processing_jobs (id, project_id, status, progress, processor, render, source_job_id, settings) VALUES (%s, %s, 'queued', 0, 'roex_tonn', 'full', %s, %s)",
+            (full_job_id, project_id, job_id, Jsonb(source["settings"]) if source["settings"] else None),
+        )
         connection.execute("UPDATE projects SET status = 'queued', updated_at = now() WHERE id = %s", (project_id,))
+        job = fetch_job(connection, project_id, full_job_id)
     enqueue(full_job_id, project_id)
     return {"job": job}
 
@@ -93,21 +161,15 @@ def create_full_render(project_id: uuid.UUID, job_id: uuid.UUID, user_id: str = 
 def list_jobs(project_id: uuid.UUID, user_id: str = Depends(require_internal_app)):
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
         find_owner(connection, user_id, project_id)
-        jobs = connection.execute(
-            "SELECT j.id, j.project_id, j.status, j.progress, j.processor, j.attempt, j.error_code, j.render, j.source_job_id, j.created_at, j.updated_at, o.format AS output_format, o.size_bytes AS output_size_bytes FROM processing_jobs j LEFT JOIN outputs o ON o.job_id = j.id WHERE j.project_id = %s ORDER BY j.created_at DESC LIMIT 20",
-            (project_id,),
-        ).fetchall()
-    return {"jobs": jobs}
+        jobs = connection.execute(f"{JOB_SELECT} WHERE j.project_id = %s ORDER BY j.created_at DESC LIMIT 20", (project_id,)).fetchall()
+    return {"jobs": [present(job) for job in jobs]}
 
 
 @router.get("/{project_id}/jobs/{job_id}")
 def get_job(project_id: uuid.UUID, job_id: uuid.UUID, user_id: str = Depends(require_internal_app)):
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
         find_owner(connection, user_id, project_id)
-        job = connection.execute(
-            "SELECT j.id, j.project_id, j.status, j.progress, j.processor, j.attempt, j.error_code, j.render, j.source_job_id, j.created_at, j.updated_at, o.format AS output_format, o.size_bytes AS output_size_bytes FROM processing_jobs j LEFT JOIN outputs o ON o.job_id = j.id WHERE j.project_id = %s AND j.id = %s",
-            (project_id, job_id),
-        ).fetchone()
+        job = fetch_job(connection, project_id, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Processing job not found")
     return {"job": job}
@@ -120,13 +182,14 @@ def retry_job(project_id: uuid.UUID, job_id: uuid.UUID, user_id: str = Depends(r
         connection.execute("SELECT id FROM projects WHERE id = %s FOR UPDATE", (project_id,))
         if connection.execute("SELECT 1 FROM processing_jobs WHERE project_id = %s AND status IN ('queued', 'processing') LIMIT 1", (project_id,)).fetchone():
             raise HTTPException(status_code=409, detail="A session job is already in progress")
-        job = connection.execute(
-            "UPDATE processing_jobs SET status = 'queued', progress = 0, error_code = NULL, attempt = attempt + 1, updated_at = now() WHERE project_id = %s AND id = %s AND status = 'failed' RETURNING id, project_id, status, progress, processor, attempt, render, source_job_id, created_at, updated_at",
+        retried = connection.execute(
+            "UPDATE processing_jobs SET status = 'queued', progress = 0, error_code = NULL, attempt = attempt + 1, updated_at = now() WHERE project_id = %s AND id = %s AND status = 'failed' RETURNING id",
             (project_id, job_id),
         ).fetchone()
-        if not job:
+        if not retried:
             raise HTTPException(status_code=409, detail="Only a failed job can be retried")
         connection.execute("UPDATE projects SET status = 'queued', updated_at = now() WHERE id = %s", (project_id,))
+        job = fetch_job(connection, project_id, job_id)
     enqueue(job_id, project_id)
     return {"job": job}
 

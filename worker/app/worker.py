@@ -16,7 +16,9 @@ from psycopg.types.json import Jsonb
 from .jobs import QUEUE_NAME
 from .uploads import database_url
 from .roex import RoExError, create_full as create_roex_full, create_preview as create_roex_preview
-from .vocals import VOCAL_CATEGORIES, autotune, autotune_settings
+from .audio import LOUDNESS_TARGET_LUFS, finish_loudness, local_mix_graph
+from .direction import settings_from_prompt
+from .vocals import VOCAL_CATEGORIES, autotune
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("fastmix.processor")
@@ -70,7 +72,7 @@ def mark_failed(job_id: uuid.UUID, project_id: uuid.UUID, error_code: str = "pro
 def claim_job(job_id: uuid.UUID):
     with db_connection() as connection:
         job = connection.execute(
-            "UPDATE processing_jobs SET status = 'processing', progress = 3, updated_at = now() WHERE id = %s AND status = 'queued' RETURNING id, project_id, processor, render, source_job_id, provider_data",
+            "UPDATE processing_jobs SET status = 'processing', progress = 3, updated_at = now() WHERE id = %s AND status = 'queued' RETURNING id, project_id, processor, render, source_job_id, provider_data, settings",
             (job_id,),
         ).fetchone()
         if not job:
@@ -90,6 +92,8 @@ def claim_job(job_id: uuid.UUID):
         "project_id": job["project_id"],
         "project_type": project["project_type"],
         "prompt": project["prompt"],
+        # Jobs created before versioned settings fall back to the session direction.
+        "settings": job["settings"] or settings_from_prompt(project["prompt"]),
         "processor": job["processor"],
         "render": job["render"],
         "provider_data": provider_data,
@@ -109,27 +113,26 @@ def render_preview(job: dict, client, bucket: str, temp_dir: Path) -> tuple[Path
         source_paths.append(target)
     update_job(job["id"], 30)
 
-    tuning = autotune_settings(job["prompt"]) if job["project_type"] == "mix" else None
+    tuning = job["settings"]["autotune"] if job["project_type"] == "mix" else None
     if tuning:
         for index, track in enumerate(job["tracks"]):
             if track["category"] in VOCAL_CATEGORIES:
-                source_paths[index] = autotune(source_paths[index], temp_dir / f"tuned-{index}.wav", **tuning)
+                source_paths[index] = autotune(source_paths[index], temp_dir / f"tuned-{index}.wav", tuning["strength"], tuning["scale"])
         logger.info("Applied autotune to vocals for job %s", job["id"])
     update_job(job["id"], 42)
 
     if job["processor"] == "roex_tonn":
         return create_roex_preview(job, source_paths, temp_dir, lambda progress: update_job(job["id"], progress))
 
-    output_path = temp_dir / "fastmix-preview.wav"
+    mixed_path = temp_dir / "local-mix.wav"
     command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y"]
     for path in source_paths:
         command.extend(["-i", str(path)])
-    count = len(source_paths)
-    input_labels = "".join(f"[{index}:a]" for index in range(count))
-    mix = f"amix=inputs={count}:duration=longest:dropout_transition=2" if count > 1 else "anull"
-    graph = f"{input_labels}{mix},loudnorm=I=-14:LRA=11:TP=-1.5[out]"
-    command.extend(["-filter_complex", graph, "-map", "[out]", "-ar", "48000", "-c:a", "pcm_s24le", str(output_path)])
+    graph = local_mix_graph([track["category"] for track in job["tracks"]], job["settings"], VOCAL_CATEGORIES)
+    command.extend(["-filter_complex", graph, "-map", "[out]", "-ar", "48000", "-c:a", "pcm_f32le", str(mixed_path)])
     subprocess.run(command, check=True, timeout=600, capture_output=True)
+    update_job(job["id"], 70)
+    output_path = finish_loudness(mixed_path, temp_dir / "fastmix-preview.wav", LOUDNESS_TARGET_LUFS[job["settings"]["loudness"]])
     update_job(job["id"], 82)
     return output_path, "wav", None
 

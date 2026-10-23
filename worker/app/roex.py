@@ -8,7 +8,6 @@ as soon as RoEx returns it, so a retried download never pays twice.
 
 import json
 import os
-import re
 import subprocess
 import time
 from pathlib import Path
@@ -17,15 +16,15 @@ from urllib.parse import urlsplit
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .audio import finish_loudness
-from .vocals import VOCAL_CATEGORIES, normalize_prompt
+from .audio import LOUDNESS_TARGET_LUFS, finish_loudness
+from .direction import style_for
+from .vocals import VOCAL_CATEGORIES
 
 
 BASE_URL = "https://tonn.roexaudio.com"
 POLL_SECONDS = 5
 POLL_TIMEOUT_SECONDS = 900
 MAX_OUTPUT_BYTES = 500 * 1024 * 1024
-LOUDNESS_TARGET_LUFS = {"LOW": -14.0, "MEDIUM": -11.0, "HIGH": -9.0}
 
 
 class RoExError(RuntimeError):
@@ -129,76 +128,6 @@ def _download(url: str, workdir: Path) -> tuple[Path, str]:
     return final, output_format
 
 
-STYLE_PATTERNS = [
-    # Recombine-only styles first; they are the closest match for Easymix's genres.
-    (r"\b(reggaeton|dembow)\b", "REGGAETON", True),
-    (r"\b(afro|afrobeats?|afro ?trap|afroswing|amapiano)\b", "AFROBEAT", True),
-    (r"\b(trap|drill|rage|phonk)\b", "TRAP", True),
-    (r"\b(lo-?fi)\b", "LO_FI", True),
-    (r"\b(k-?pop)\b", "K_POP", True),
-    (r"\b(latin|latino|salsa|bachata)\b", "LATIN", True),
-    (r"\b(jazz|jazzy)\b", "JAZZ", True),
-    (r"\b(house)\b", "HOUSE", True),
-    (r"\b(techno)\b", "TECHNO", True),
-    (r"\b(country)\b", "COUNTRY_ACOUSTIC", True),
-    (r"\b(cinematic|cinematique|film score)\b", "CINEMATIC", True),
-    (r"\b(trap|drill|rap|hip[ -]?hop|grime|afro|afrobeats?|boom ?bap|cloud ?rap|phonk|rnb|r&b)\b", "HIPHOP_GRIME", False),
-    (r"\b(pop|catchy|radio)\b", "POP", False),
-    (r"\b(acoustic|acoustique|folk|unplugged)\b", "ACOUSTIC", False),
-    (r"\b(electronic|electronique|edm|techno|house|synth)\b", "ELECTRONIC", False),
-    (r"\b(metal|heavy)\b", "METAL", False),
-    (r"\b(rock|indie|guitar band)\b", "ROCK_INDIE", False),
-    (r"\b(reggae|dub)\b", "REGGAE_DUB", False),
-    (r"\b(orchestral|cinematic|strings|cinematique)\b", "ORCHESTRAL", False),
-]
-
-
-def _style(prompt: str, endpoint: str = "mix") -> str:
-    """Map free-text direction to the style enum accepted by the given endpoint."""
-    text = normalize_prompt(prompt)
-    for pattern, style, extended_only in STYLE_PATTERNS:
-        if extended_only and endpoint != "recombine":
-            continue
-        if style == "ORCHESTRAL" and endpoint == "master":
-            continue  # /masteringpreview does not accept ORCHESTRAL.
-        if re.search(pattern, text):
-            return style
-    return "OTHER"
-
-
-def _loudness(prompt: str) -> str:
-    text = normalize_prompt(prompt)
-    if re.search(r"\b(loud|louder|club|competitive|aggressive|banger|fort|puissant)\b", text):
-        return "HIGH"
-    if re.search(r"\b(dynamic|dynamique|quiet|soft|gentle|natural|naturel|doux)\b", text):
-        return "LOW"
-    return "MEDIUM"
-
-
-def _vocal_gain(prompt: str) -> float:
-    text = normalize_prompt(prompt)
-    if re.search(r"\b(vocals? (upfront|forward|louder|on top)|louder vocals?|voix (devant|en avant|plus forte))\b", text):
-        return 2.0
-    if re.search(r"\b(vocals? (back|lower|quieter|buried|blended)|quieter vocals?|voix (plus basse|en retrait))\b", text):
-        return -2.0
-    return 0.0
-
-
-def _reverb(prompt: str, category: str) -> str:
-    text = normalize_prompt(prompt)
-    if category not in VOCAL_CATEGORIES:
-        return "NONE"
-    if re.search(r"\b(dry|sec|seche|no reverb|without reverb|sans reverbe)\b", text):
-        return "NONE"
-    if re.search(r"\b(lush|spacious|echoey|echoing|heavy reverb|lots of reverb)\b", text):
-        return "HIGH"
-    if re.search(r"\b(some reverb|medium reverb|roomy|space|spacieux)\b", text):
-        return "MEDIUM"
-    if re.search(r"\b(reverb|reverbe|ambient)\b", text):
-        return "LOW"
-    return "NONE"
-
-
 def plan(job: dict) -> str:
     """Choose the RoEx workflow for a session: master, recombine, or multitrack."""
     if job["project_type"] == "master":
@@ -209,7 +138,7 @@ def plan(job: dict) -> str:
     return "multitrack"
 
 
-def _prepare_track(source: Path, target: Path, max_duration_seconds: int) -> None:
+def _prepare_track(source: Path, target: Path, max_duration_seconds: int, gain_db: float = 0.0) -> None:
     probe = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(source)],
         check=True,
@@ -224,7 +153,7 @@ def _prepare_track(source: Path, target: Path, max_duration_seconds: int) -> Non
     if duration <= 0 or duration > max_duration_seconds:
         raise RoExError(f"RoEx Tonn accepts tracks up to {max_duration_seconds // 60} minutes long for this job", "invalid_audio")
     subprocess.run(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source), "-vn", "-ar", "44100", "-c:a", "pcm_s24le", str(target)],
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source), "-vn", *(["-af", f"volume={gain_db}dB"] if gain_db else []), "-ar", "44100", "-c:a", "pcm_s24le", str(target)],
         check=True,
         capture_output=True,
         timeout=600,
@@ -267,12 +196,14 @@ def _preview_url(result_key: str, url_key: str):
 def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress) -> tuple[Path, str, dict]:
     """Create a free 30-second AI preview. Returns the local file, its format, and provider data."""
     workflow = plan(job)
-    prompt = job.get("prompt", "")
+    settings = job["settings"]
     max_duration_seconds = 10 * 60 if workflow == "master" else 8 * 60
     prepared: list[Path] = []
-    for index, source in enumerate(source_paths):
+    for index, (source, track) in enumerate(zip(source_paths, job["tracks"], strict=True)):
         target = workdir / f"roex-track-{index}.wav"
-        _prepare_track(source, target, max_duration_seconds)
+        # Recombine takes vocalGainDb natively; multitrack has no vocal-level control, so pre-gain those stems.
+        gain = settings["vocal_gain_db"] if workflow == "multitrack" and track["category"] in VOCAL_CATEGORIES else 0.0
+        _prepare_track(source, target, max_duration_seconds, gain)
         prepared.append(target)
 
     if workflow == "master":
@@ -282,7 +213,7 @@ def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress)
         progress(35)
         _, created = _api_request(
             "/masteringpreview",
-            {"masteringData": {"trackData": [{"trackURL": readable_url}], "musicalStyle": _style(prompt, "master"), "desiredLoudness": _loudness(prompt), "sampleRate": "44100"}},
+            {"masteringData": {"trackData": [{"trackURL": readable_url}], "musicalStyle": style_for(settings["genre"], "master"), "desiredLoudness": settings["loudness"], "sampleRate": "44100"}},
         )
         task_id = created.get("mastering_task_id") or created.get("masteringTaskId")
         if not isinstance(task_id, str):
@@ -298,7 +229,7 @@ def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress)
         progress(35)
         _, created = _api_request(
             "/recombine",
-            {"recombineData": {"vocalStemURL": vocal_url, "backingStemURL": backing_url, "musicalStyle": _style(prompt, "recombine"), "desiredLoudness": _loudness(prompt), "vocalGainDb": _vocal_gain(prompt)}},
+            {"recombineData": {"vocalStemURL": vocal_url, "backingStemURL": backing_url, "musicalStyle": style_for(settings["genre"], "recombine"), "desiredLoudness": settings["loudness"], "vocalGainDb": settings["vocal_gain_db"]}},
         )
         task_id = created.get("recombineTaskId")
         if not isinstance(task_id, str) or created.get("error"):
@@ -340,13 +271,13 @@ def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress)
                     "instrumentGroup": group,
                     "presenceSetting": "LEAD" if category == "lead_vocal" else "BACKGROUND" if category in {"doubles", "backing_vocals", "adlibs"} else "NORMAL",
                     "panPreference": "CENTRE" if category in {"beat", "lead_vocal"} else "NO_PREFERENCE",
-                    "reverbPreference": _reverb(prompt, category),
+                    "reverbPreference": settings["reverb"] if category in VOCAL_CATEGORIES else "NONE",
                 }
             )
             progress(min(35, 10 + int(25 * (index + 1) / len(prepared))))
         _, created = _api_request(
             "/mixpreview",
-            {"multitrackData": {"trackData": track_data, "musicalStyle": _style(prompt, "mix"), "returnStems": False, "sampleRate": 44100}},
+            {"multitrackData": {"trackData": track_data, "musicalStyle": style_for(settings["genre"], "mix"), "returnStems": False, "sampleRate": 44100}},
         )
         task_id = created.get("multitrack_task_id") or created.get("multitrackTaskId")
         if not isinstance(task_id, str):
@@ -357,7 +288,7 @@ def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress)
             {"multitrackData": {"multitrackTaskId": task_id, "retrieveFXSettings": False}},
             _preview_url("previewMixTaskResults", "download_url_preview_mixed"),
         )
-        provider_data = {"workflow": "multitrack", "task_id": task_id, "track_urls": [item["trackURL"] for item in track_data], "loudness": _loudness(prompt)}
+        provider_data = {"workflow": "multitrack", "task_id": task_id, "track_urls": [item["trackURL"] for item in track_data], "loudness": settings["loudness"]}
 
     progress(85)
     output, output_format = _download(url, workdir)

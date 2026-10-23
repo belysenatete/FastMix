@@ -1,9 +1,7 @@
-"""Prompt-driven vocal pitch correction (autotune) with Praat's PSOLA resynthesis."""
+"""Vocal pitch correction (autotune) with Praat's PSOLA resynthesis."""
 
 import math
-import re
 import subprocess
-import unicodedata
 from pathlib import Path
 
 import numpy as np
@@ -12,50 +10,11 @@ from parselmouth.praat import call
 
 
 VOCAL_CATEGORIES = {"lead_vocal", "doubles", "backing_vocals", "adlibs"}
-NOTE_CLASSES = {"c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11}
-SOLFEGE = {"do": "c", "re": "d", "mi": "e", "fa": "f", "sol": "g", "la": "a", "si": "b"}
-SCALE_STEPS = {"major": (0, 2, 4, 5, 7, 9, 11), "minor": (0, 2, 3, 5, 7, 8, 10)}
 PITCH_FLOOR_HZ = 75
 PITCH_CEILING_HZ = 900
 
 
-def normalize_prompt(text: str) -> str:
-    """Lowercase and strip accents so English and French directions match the same patterns."""
-    return "".join(character for character in unicodedata.normalize("NFKD", text.lower()) if not unicodedata.combining(character))
-
-
-def _key_scale(text: str) -> tuple[int, ...] | None:
-    english = re.search(r"\b([a-g])\s*(#|sharp|b|flat)?\s*(major|minor|maj|min)\b", text)
-    french = re.search(r"\b(do|re|mi|fa|sol|la|si)\s*(#|diese|b|bemol)?\s*(majeur|mineur)\b", text)
-    match = english or french
-    if not match:
-        return None
-    note, accidental, quality = match.groups()
-    root = NOTE_CLASSES[SOLFEGE.get(note, note)]
-    if accidental in {"#", "sharp", "diese"}:
-        root += 1
-    elif accidental in {"b", "flat", "bemol"}:
-        root -= 1
-    steps = SCALE_STEPS["minor" if quality in {"minor", "min", "mineur"} else "major"]
-    return tuple(sorted((root + step) % 12 for step in steps))
-
-
-def autotune_settings(prompt: str) -> dict | None:
-    """Return pitch-correction settings when the direction asks for autotune, otherwise None."""
-    text = normalize_prompt(prompt)
-    if re.search(r"\b(no|without|sans|pas d'?)\s*(auto-?tune|pitch correction)\b", text):
-        return None
-    if not re.search(r"\b(auto-?tune[ds]?|autotunee?|pitch[ -]correct(ion|ed)?|tuned vocals?|t-?pain|melodyne)\b", text):
-        return None
-    strength = 0.8
-    if re.search(r"\b(hard|heavy|strong|robotic|robotique|t-?pain|extreme|fort|max)\b", text):
-        strength = 1.0
-    elif re.search(r"\b(subtle|light|natural|gentle|soft|leger|legere|discret|naturel)\b", text):
-        strength = 0.45
-    return {"strength": strength, "scale": _key_scale(text)}
-
-
-def _snap(midi: float, scale: tuple[int, ...] | None) -> float:
+def _snap(midi: float, scale: list[int] | tuple[int, ...] | None) -> float:
     nearest = round(midi)
     if not scale:
         return nearest
@@ -63,7 +22,7 @@ def _snap(midi: float, scale: tuple[int, ...] | None) -> float:
     return min(candidates, key=lambda note: abs(note - midi))
 
 
-def autotune(source: Path, target: Path, strength: float, scale: tuple[int, ...] | None = None) -> Path:
+def autotune(source: Path, target: Path, strength: float, scale: list[int] | tuple[int, ...] | None = None) -> Path:
     """Pull each voiced pitch point toward the nearest note (or note in `scale`) by `strength` (0–1)."""
     decoded = target.with_name(f"{target.stem}-decoded.wav")
     subprocess.run(

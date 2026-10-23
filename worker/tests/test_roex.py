@@ -6,6 +6,7 @@ from unittest import mock
 from urllib.error import HTTPError
 
 from app import roex
+from app.direction import settings_from_prompt
 
 
 def track(category: str) -> dict:
@@ -34,27 +35,6 @@ class PlanAndPromptTests(unittest.TestCase):
         self.assertEqual(roex.plan({"project_type": "mix", "tracks": [track("adlibs"), track("beat")]}), "recombine")
         self.assertEqual(roex.plan({"project_type": "mix", "tracks": [track("beat"), track("lead_vocal"), track("adlibs")]}), "multitrack")
         self.assertEqual(roex.plan({"project_type": "mix", "tracks": [track("instrument"), track("lead_vocal")]}), "multitrack")
-
-    def test_style_respects_each_endpoint_enum(self):
-        self.assertEqual(roex._style("Dark drill, heavy 808", "recombine"), "TRAP")
-        self.assertEqual(roex._style("Dark drill, heavy 808", "mix"), "HIPHOP_GRIME")
-        self.assertEqual(roex._style("afro trap vibe", "recombine"), "AFROBEAT")
-        self.assertEqual(roex._style("Reggaeton dembow", "recombine"), "REGGAETON")
-        self.assertEqual(roex._style("lofi chill", "recombine"), "LO_FI")
-        self.assertEqual(roex._style("big orchestral strings", "mix"), "ORCHESTRAL")
-        self.assertEqual(roex._style("big orchestral strings", "master"), "OTHER")
-        self.assertEqual(roex._style("something unusual", "recombine"), "OTHER")
-
-    def test_loudness_vocal_gain_and_reverb(self):
-        self.assertEqual(roex._loudness("make it loud for the club"), "HIGH")
-        self.assertEqual(roex._loudness("keep it dynamic and natural"), "LOW")
-        self.assertEqual(roex._loudness("warm vocal"), "MEDIUM")
-        self.assertEqual(roex._vocal_gain("vocals upfront please"), 2.0)
-        self.assertEqual(roex._vocal_gain("vocals blended into the beat"), -2.0)
-        self.assertEqual(roex._vocal_gain("trap"), 0.0)
-        self.assertEqual(roex._reverb("lush and spacious", "lead_vocal"), "HIGH")
-        self.assertEqual(roex._reverb("lush and spacious", "beat"), "NONE")
-        self.assertEqual(roex._reverb("dry vocal", "lead_vocal"), "NONE")
 
 
 class ApiErrorTests(unittest.TestCase):
@@ -93,7 +73,7 @@ class PreviewTests(unittest.TestCase):
             "/recombinestatus/rc_1": [(202, {}), (200, {"status": "complete"})],
             "/retrieverecombinepreview": [(202, {}), (200, {"preview": {"preview_url": "https://roex.test/preview.mp3"}})],
         })
-        job = {"project_type": "mix", "prompt": "dark drill, vocals upfront, loud", "tracks": [track("lead_vocal"), track("beat")]}
+        job = {"project_type": "mix", "settings": settings_from_prompt("dark drill, vocals upfront, loud"), "tracks": [track("lead_vocal"), track("beat")]}
         with mock.patch.object(roex, "_api_request", api):
             output, output_format, provider_data = roex.create_preview(job, [Path("a"), Path("b")], self.workdir, lambda _: None)
         payload = api.calls[0][1]["recombineData"]
@@ -110,7 +90,7 @@ class PreviewTests(unittest.TestCase):
             "/recombine": [(200, {"recombineTaskId": "rc_2"})],
             "/recombinestatus/rc_2": [(200, {"status": "failed", "error": True})],
         })
-        job = {"project_type": "mix", "prompt": "", "tracks": [track("beat"), track("lead_vocal")]}
+        job = {"project_type": "mix", "settings": settings_from_prompt(""), "tracks": [track("beat"), track("lead_vocal")]}
         with mock.patch.object(roex, "_api_request", api), self.assertRaises(roex.RoExError) as raised:
             roex.create_preview(job, [Path("a"), Path("b")], self.workdir, lambda _: None)
         self.assertEqual(raised.exception.code, "invalid_audio")
@@ -120,7 +100,7 @@ class PreviewTests(unittest.TestCase):
             "/mixpreview": [(200, {"multitrack_task_id": "mt_1"})],
             "/retrievepreviewmix": [(200, {"previewMixTaskResults": {"status": "MIX_TASK_PREVIEW_COMPLETED", "download_url_preview_mixed": "https://roex.test/mix.wav"}})],
         })
-        job = {"project_type": "mix", "prompt": "lush pop", "tracks": [track("beat"), track("lead_vocal"), track("backing_vocals")]}
+        job = {"project_type": "mix", "settings": settings_from_prompt("lush pop"), "tracks": [track("beat"), track("lead_vocal"), track("backing_vocals")]}
         with mock.patch.object(roex, "_api_request", api), mock.patch.object(roex, "finish_loudness", side_effect=lambda source, target, lufs: target) as finish:
             output, output_format, provider_data = roex.create_preview(job, [Path("a"), Path("b"), Path("c")], self.workdir, lambda _: None)
         tracks = api.calls[0][1]["multitrackData"]["trackData"]
@@ -135,7 +115,7 @@ class PreviewTests(unittest.TestCase):
             "/masteringpreview": [(200, {"mastering_task_id": "ms_1"})],
             "/retrievepreviewmaster": [(200, {"previewMasterTaskResults": {"download_url_mastered_preview": "https://roex.test/m.wav"}})],
         })
-        job = {"project_type": "master", "prompt": "cinematic orchestral", "tracks": [track("master")]}
+        job = {"project_type": "master", "settings": settings_from_prompt("cinematic orchestral"), "tracks": [track("master")]}
         with mock.patch.object(roex, "_api_request", api):
             roex.create_preview(job, [Path("a")], self.workdir, lambda _: None)
         self.assertEqual(api.calls[0][1]["masteringData"]["musicalStyle"], "OTHER")
