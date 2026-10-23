@@ -16,6 +16,7 @@ from psycopg.types.json import Jsonb
 from .jobs import QUEUE_NAME
 from .uploads import database_url
 from .roex import RoExError, create_full as create_roex_full, create_preview as create_roex_preview
+from .vocals import VOCAL_CATEGORIES, autotune, autotune_settings
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("fastmix.processor")
@@ -106,6 +107,14 @@ def render_preview(job: dict, client, bucket: str, temp_dir: Path) -> tuple[Path
         target = temp_dir / f"input-{index}.audio"
         client.download_file(bucket, track["storage_key"], str(target))
         source_paths.append(target)
+    update_job(job["id"], 30)
+
+    tuning = autotune_settings(job["prompt"]) if job["project_type"] == "mix" else None
+    if tuning:
+        for index, track in enumerate(job["tracks"]):
+            if track["category"] in VOCAL_CATEGORIES:
+                source_paths[index] = autotune(source_paths[index], temp_dir / f"tuned-{index}.wav", **tuning)
+        logger.info("Applied autotune to vocals for job %s", job["id"])
     update_job(job["id"], 42)
 
     if job["processor"] == "roex_tonn":

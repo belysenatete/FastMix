@@ -11,7 +11,6 @@ import os
 import re
 import subprocess
 import time
-import unicodedata
 from pathlib import Path
 from http.client import HTTPSConnection
 from urllib.parse import urlsplit
@@ -19,13 +18,13 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .audio import finish_loudness
+from .vocals import VOCAL_CATEGORIES, normalize_prompt
 
 
 BASE_URL = "https://tonn.roexaudio.com"
 POLL_SECONDS = 5
 POLL_TIMEOUT_SECONDS = 900
 MAX_OUTPUT_BYTES = 500 * 1024 * 1024
-VOCAL_CATEGORIES = {"lead_vocal", "doubles", "backing_vocals", "adlibs"}
 LOUDNESS_TARGET_LUFS = {"LOW": -14.0, "MEDIUM": -11.0, "HIGH": -9.0}
 
 
@@ -35,10 +34,6 @@ class RoExError(RuntimeError):
     def __init__(self, message: str, code: str = "provider_failed"):
         super().__init__(message)
         self.code = code
-
-
-def _normalize(text: str) -> str:
-    return "".join(character for character in unicodedata.normalize("NFKD", text.lower()) if not unicodedata.combining(character))
 
 
 def _api_request(path: str, payload: dict | None = None, method: str = "POST") -> tuple[int, dict]:
@@ -160,7 +155,7 @@ STYLE_PATTERNS = [
 
 def _style(prompt: str, endpoint: str = "mix") -> str:
     """Map free-text direction to the style enum accepted by the given endpoint."""
-    text = _normalize(prompt)
+    text = normalize_prompt(prompt)
     for pattern, style, extended_only in STYLE_PATTERNS:
         if extended_only and endpoint != "recombine":
             continue
@@ -172,7 +167,7 @@ def _style(prompt: str, endpoint: str = "mix") -> str:
 
 
 def _loudness(prompt: str) -> str:
-    text = _normalize(prompt)
+    text = normalize_prompt(prompt)
     if re.search(r"\b(loud|louder|club|competitive|aggressive|banger|fort|puissant)\b", text):
         return "HIGH"
     if re.search(r"\b(dynamic|dynamique|quiet|soft|gentle|natural|naturel|doux)\b", text):
@@ -181,7 +176,7 @@ def _loudness(prompt: str) -> str:
 
 
 def _vocal_gain(prompt: str) -> float:
-    text = _normalize(prompt)
+    text = normalize_prompt(prompt)
     if re.search(r"\b(vocals? (upfront|forward|louder|on top)|louder vocals?|voix (devant|en avant|plus forte))\b", text):
         return 2.0
     if re.search(r"\b(vocals? (back|lower|quieter|buried|blended)|quieter vocals?|voix (plus basse|en retrait))\b", text):
@@ -190,7 +185,7 @@ def _vocal_gain(prompt: str) -> float:
 
 
 def _reverb(prompt: str, category: str) -> str:
-    text = _normalize(prompt)
+    text = normalize_prompt(prompt)
     if category not in VOCAL_CATEGORIES:
         return "NONE"
     if re.search(r"\b(dry|sec|seche|no reverb|without reverb|sans reverbe)\b", text):

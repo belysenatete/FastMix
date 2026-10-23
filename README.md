@@ -24,6 +24,8 @@ To enable RoEx AI mixing and mastering, create a Tonn API account at [tonn-porta
 
 Every job starts with a free 30-second preview (free while the account has a positive credit balance). The full-length track is rendered only when the user clicks **Get full track** and costs about 220–250 credits ($1.76–$2.50) once per version; the paid result URL is saved so retries never pay twice. Do not enable automatic credit top-ups unless you intend to pay for them. See [Tonn's security and data handling notes](https://tonn-portal.roexaudio.com/security-and-data-handling) before sending private or unreleased tracks.
 
+**Autotune** runs locally in the worker (no RoEx credits) whenever a mix direction asks for it, before either engine processes the vocals. "subtle/natural" applies light correction, "hard/robotic" gives the locked effect, and a key such as "in A minor" or "en la mineur" keeps notes in that scale; "no autotune" turns it off. It uses Praat's PSOLA through `praat-parselmouth` (GPL-3.0, used server-side only) and takes about 20 seconds per 3-minute vocal.
+
 Worker unit tests run inside the API image: `docker compose run --rm -v ./worker/tests:/srv/fastmix/tests:ro --no-deps api python -m unittest discover -s tests`.
 
 Audio uploads require the Compose API and private object storage. See `phases.md`, `projectDescription.md`, `projectTracker.md`, and `codingPrinciples.md` for product scope and implementation status.
