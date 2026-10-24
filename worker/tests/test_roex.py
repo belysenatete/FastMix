@@ -62,6 +62,7 @@ class PreviewTests(unittest.TestCase):
             mock.patch.object(roex, "_prepare_track"),
             mock.patch.object(roex, "_upload", side_effect=lambda path: f"https://roex.test/{path.name}"),
             mock.patch.object(roex, "_download", side_effect=lambda url, workdir: (workdir / "out.mp3", "mp3")),
+            mock.patch.object(roex, "limit_true_peak", side_effect=lambda source, target: source),
         ]
         for patcher in patches:
             patcher.start()
@@ -153,6 +154,9 @@ class FullRenderTests(unittest.TestCase):
         download = mock.patch.object(roex, "_download", side_effect=self.fake_download)
         download.start()
         self.addCleanup(download.stop)
+        limiter = mock.patch.object(roex, "limit_true_peak", side_effect=lambda source, target: source)
+        limiter.start()
+        self.addCleanup(limiter.stop)
 
     def fake_download(self, url, workdir):
         self.order.append(f"download {url}")
@@ -205,6 +209,13 @@ class FullRenderTests(unittest.TestCase):
             with self.assertRaises(roex.RoExError):
                 roex.create_full({"workflow": "master", "task_id": "ms_1", "final_url": "https://roex.test/old.wav"}, self.workdir, lambda _: None, self.remember)
         self.assertEqual(api.calls, [])
+
+    def test_hot_master_is_limited_and_delivered_as_wav(self):
+        api = FakeApi({"/retrievefinalmaster": [(200, {"finalMasterTaskResults": "https://roex.test/master.mp3"})]})
+        with mock.patch.object(roex, "_api_request", api), mock.patch.object(roex, "limit_true_peak", side_effect=lambda source, target: target) as limiter:
+            output, output_format = roex.create_full({"workflow": "master", "task_id": "ms_1"}, self.workdir, lambda _: None, self.remember)
+        self.assertEqual((output.name, output_format), ("roex-limited.wav", "wav"))
+        limiter.assert_called_once()
 
     def test_unknown_provider_data_is_rejected(self):
         with self.assertRaises(roex.RoExError):

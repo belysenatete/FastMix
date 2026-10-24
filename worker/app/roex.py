@@ -16,7 +16,7 @@ from urllib.parse import urlsplit
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .audio import LOUDNESS_TARGET_LUFS, finish_loudness
+from .audio import LOUDNESS_TARGET_LUFS, finish_loudness, limit_true_peak
 from .direction import style_for
 from .vocals import VOCAL_CATEGORIES
 
@@ -204,6 +204,12 @@ def _preview_url(result_key: str, url_key: str):
     return extract
 
 
+def _streaming_safe(output: Path, output_format: str, workdir: Path) -> tuple[Path, str]:
+    """RoEx masters can peak above 0 dBTP; limit them to the -1 dBTP streaming platforms ask for."""
+    limited = limit_true_peak(output, workdir / "roex-limited.wav")
+    return (output, output_format) if limited == output else (limited, "wav")
+
+
 def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress) -> tuple[Path, str, dict]:
     """Create a free 30-second AI preview. Returns the local file, its format, and provider data."""
     workflow = plan(job)
@@ -307,6 +313,7 @@ def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress)
     if workflow == "multitrack":
         # RoEx multitrack mixes are not mastered; finish them to a release-like loudness locally.
         output, output_format = finish_loudness(output, workdir / "roex-finished.wav", LOUDNESS_TARGET_LUFS[provider_data["loudness"]]), "wav"
+    output, output_format = _streaming_safe(output, output_format, workdir)
     return output, output_format, provider_data
 
 
@@ -360,4 +367,4 @@ def create_full(provider_data: dict, workdir: Path, progress, remember) -> tuple
         return create_full({key: value for key, value in provider_data.items() if key != "final_url"}, workdir, progress, remember)
     if workflow == "multitrack":
         output, output_format = finish_loudness(output, workdir / "roex-finished.wav", LOUDNESS_TARGET_LUFS.get(provider_data.get("loudness", "MEDIUM"), -11.0)), "wav"
-    return output, output_format
+    return _streaming_safe(output, output_format, workdir)

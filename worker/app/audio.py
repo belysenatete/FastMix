@@ -32,6 +32,50 @@ def local_mix_graph(categories: list[str], settings: dict, vocal_categories: set
     return ";".join([*chains, mix])
 
 
+STREAMING_TRUE_PEAK_DB = -1.0
+
+
+def measure_true_peak(path: Path) -> float:
+    """Highest inter-sample (true) peak in dBTP, as streaming platforms measure it."""
+    analysis = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-nostats", "-i", str(path), "-af", "ebur128=peak=true", "-f", "null", "-"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+    peaks = re.findall(r"Peak:\s+(-?[\d.]+|-inf) dBFS", analysis.stderr)
+    return float(peaks[-1]) if peaks and peaks[-1] != "-inf" else float("-inf")
+
+
+def limit_true_peak(source: Path, target: Path, ceiling_db: float = STREAMING_TRUE_PEAK_DB) -> Path:
+    """Keep true peaks under the ceiling; audio already under it is returned untouched."""
+    if measure_true_peak(source) <= ceiling_db:
+        return source
+    rate = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=sample_rate", "-of", "default=nw=1:nk=1", str(source)],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    ).stdout.strip() or "44100"
+    # Limit at 4x oversampling so inter-sample peaks are caught. Resampling back can overshoot a little
+    # on real music, so verify the result and retry with a larger margin when it is still over.
+    for margin_db in (0.3, 0.6, 1.0):
+        limit = 10 ** ((ceiling_db - margin_db) / 20)
+        subprocess.run(
+            ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source), "-af",
+             f"aresample={int(rate) * 4},alimiter=limit={limit:.4f}:attack=1:release=60:level=0,aresample={rate}",
+             "-c:a", "pcm_s24le", str(target)],
+            check=True,
+            capture_output=True,
+            timeout=600,
+        )
+        if measure_true_peak(target) <= ceiling_db:
+            break
+    return target
+
+
 def finish_loudness(source: Path, target: Path, target_lufs: float, true_peak: float = -1.0) -> Path:
     """Normalize to an integrated loudness with a true-peak ceiling using two-pass loudnorm."""
     settings = f"I={target_lufs}:TP={true_peak}:LRA=11"
