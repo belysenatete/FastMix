@@ -110,6 +110,30 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(output_format, "wav")
         self.assertEqual(finish.call_args.args[2], -11.0)
 
+    def test_multitrack_sends_sample_rate_as_string(self):
+        api = FakeApi({
+            "/mixpreview": [(200, {"multitrack_task_id": "mt_2"})],
+            "/retrievepreviewmix": [(200, {"previewMixTaskResults": {"download_url_preview_mixed": "https://roex.test/mix.wav"}})],
+        })
+        job = {"project_type": "mix", "settings": settings_from_prompt("pop"), "tracks": [track("beat"), track("lead_vocal"), track("adlibs")]}
+        with mock.patch.object(roex, "_api_request", api), mock.patch.object(roex, "finish_loudness", side_effect=lambda source, target, lufs: target):
+            roex.create_preview(job, [Path("a"), Path("b"), Path("c")], self.workdir, lambda _: None)
+        self.assertEqual(api.calls[0][1]["multitrackData"]["sampleRate"], "44100")
+
+    def test_development_key_placeholder_tasks_are_refused(self):
+        cases = [
+            ({"project_type": "mix", "tracks": [track("beat"), track("lead_vocal")]}, "/recombine", {"recombineTaskId": "rc_x", "error": False, "message": "Successfully created dev recombine task (dummy)."}),
+            ({"project_type": "master", "tracks": [track("master")]}, "/masteringpreview", {"mastering_task_id": "ms_x", "message": "Successfully created dev preview mastering task (dummy)."}),
+            ({"project_type": "mix", "tracks": [track("beat"), track("lead_vocal"), track("adlibs")]}, "/mixpreview", {"multitrack_task_id": "mt_x", "message": "Successfully created dev preview mix task (dummy)."}),
+        ]
+        for job, path, created in cases:
+            api = FakeApi({path: [(200, created)]})
+            job = {**job, "settings": settings_from_prompt("trap")}
+            with mock.patch.object(roex, "_api_request", api), self.assertRaises(roex.RoExError) as raised:
+                roex.create_preview(job, [Path(str(index)) for index in range(len(job["tracks"]))], self.workdir, lambda _: None)
+            self.assertEqual(raised.exception.code, "provider_dev_key", path)
+            self.assertEqual(api.paths(), [path], "no result is fetched for a placeholder task")
+
     def test_master_never_sends_orchestral(self):
         api = FakeApi({
             "/masteringpreview": [(200, {"mastering_task_id": "ms_1"})],

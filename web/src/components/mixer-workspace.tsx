@@ -24,6 +24,7 @@ const failureMessages: Record<string, string> = {
   provider_credits: "Your RoEx credit balance is too low. Add credits in the Tonn portal, then retry.",
   provider_auth: "RoEx rejected the API key. Check ROEX_API_KEY, rebuild the API and processor, then retry.",
   provider_not_configured: "RoEx AI isn't configured. Add ROEX_API_KEY to the root .env and rebuild the API and processor.",
+  provider_dev_key: "The RoEx key in .env is a development key, which only returns placeholder results. Put your production key in ROEX_API_KEY, rebuild the API and processor, then retry.",
   provider_expired: "The RoEx download link expired. Retry to request it again.",
   invalid_audio: "RoEx couldn't process this audio. Use clean tracks under 8 minutes each, then retry.",
   queue_unavailable: "The processing queue was unavailable. Retry in a moment.",

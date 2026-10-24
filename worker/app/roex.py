@@ -177,6 +177,17 @@ def _poll(path: str, payload: dict | None, extract, method: str = "POST") -> obj
     raise RoExError("RoEx Tonn processing timed out")
 
 
+def _task_id(created: dict, *keys: str) -> str | None:
+    """Return a newly created task's ID, refusing the placeholder tasks RoEx creates for development keys."""
+    if "dummy" in str(created.get("message", "")).lower():
+        raise RoExError(
+            "This RoEx API key is a development key, so RoEx returns placeholder results instead of real mixes. Use your production key for real AI processing.",
+            "provider_dev_key",
+        )
+    task_id = next((created[key] for key in keys if isinstance(created.get(key), str)), None)
+    return None if created.get("error") else task_id
+
+
 def _task_failed(result: dict) -> bool:
     return bool(result.get("error")) or str(result.get("status", "")).lower() == "failed"
 
@@ -215,8 +226,8 @@ def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress)
             "/masteringpreview",
             {"masteringData": {"trackData": [{"trackURL": readable_url}], "musicalStyle": style_for(settings["genre"], "master"), "desiredLoudness": settings["loudness"], "sampleRate": "44100"}},
         )
-        task_id = created.get("mastering_task_id") or created.get("masteringTaskId")
-        if not isinstance(task_id, str):
+        task_id = _task_id(created, "mastering_task_id", "masteringTaskId")
+        if not task_id:
             raise RoExError("RoEx Tonn did not create a mastering task")
         progress(55)
         url = _poll("/retrievepreviewmaster", {"masteringData": {"masteringTaskId": task_id}}, _preview_url("previewMasterTaskResults", "download_url_mastered_preview"))
@@ -231,8 +242,8 @@ def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress)
             "/recombine",
             {"recombineData": {"vocalStemURL": vocal_url, "backingStemURL": backing_url, "musicalStyle": style_for(settings["genre"], "recombine"), "desiredLoudness": settings["loudness"], "vocalGainDb": settings["vocal_gain_db"]}},
         )
-        task_id = created.get("recombineTaskId")
-        if not isinstance(task_id, str) or created.get("error"):
+        task_id = _task_id(created, "recombineTaskId")
+        if not task_id:
             raise RoExError("RoEx Tonn did not create a vocal mix task")
         progress(50)
 
@@ -275,12 +286,13 @@ def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress)
                 }
             )
             progress(min(35, 10 + int(25 * (index + 1) / len(prepared))))
+        # The live /mixpreview rejects a numeric sampleRate ("JSON format not valid: type: string") despite the published spec.
         _, created = _api_request(
             "/mixpreview",
-            {"multitrackData": {"trackData": track_data, "musicalStyle": style_for(settings["genre"], "mix"), "returnStems": False, "sampleRate": 44100}},
+            {"multitrackData": {"trackData": track_data, "musicalStyle": style_for(settings["genre"], "mix"), "returnStems": False, "sampleRate": "44100"}},
         )
-        task_id = created.get("multitrack_task_id") or created.get("multitrackTaskId")
-        if not isinstance(task_id, str):
+        task_id = _task_id(created, "multitrack_task_id", "multitrackTaskId")
+        if not task_id:
             raise RoExError("RoEx Tonn did not create a mixing task")
         progress(55)
         url = _poll(
