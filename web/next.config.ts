@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    // The Clerk proxy buffers request bodies and silently truncates them past this size (default 10 MB),
+    // which corrupted audio uploads. Match the 105 MB request cap enforced in worker-proxy.ts.
+    proxyClientMaxBodySize: "105mb",
+  },
   async headers() {
     const headers = [
       { key: "X-Content-Type-Options", value: "nosniff" },
