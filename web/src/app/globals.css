@@ -171,7 +171,12 @@ button { cursor: pointer; }
 .auth-page { min-height: 100vh; padding: 24px 0 56px; }
 .auth-top { display: flex; justify-content: space-between; align-items: center; width: min(1100px, calc(100% - 40px)); margin: 0 auto 44px; }
 .auth-layout { width: min(980px, calc(100% - 40px)); margin: 0 auto; display: grid; grid-template-columns: 1fr 420px; gap: 44px; align-items: start; }
-.auth-intro .lede { margin-bottom: 0; }
+.auth-intro { padding-top: 12px; }
+.auth-points { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 14px; max-width: 440px; }
+.auth-points li { display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-panel); }
+.auth-points li > span { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--deep); border: 1px solid var(--line); color: var(--brass); font-family: var(--font-mono); font-size: 13px; }
+.auth-points b { display: block; font-family: var(--font-display); font-size: 17px; font-weight: 600; letter-spacing: .03em; }
+.auth-points p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
 .auth-form .cl-rootBox, .auth-form .cl-card { width: 100%; }
 .clerk-card { box-shadow: none; border: 1px solid var(--line); }
 .clerk-title { font-family: var(--font-display); letter-spacing: .02em; }
@@ -231,6 +236,8 @@ button { cursor: pointer; }
 input, select, textarea { background: var(--deep); border: 1px solid var(--control); border-radius: var(--radius); padding: 9px 12px; min-height: 42px; width: 100%; color: var(--text); }
 input::placeholder, textarea::placeholder { color: #8c8474; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
+/* Chrome paints autofilled fields light blue regardless of the theme, including inside the Clerk form. */
+input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus { -webkit-box-shadow: 0 0 0 1000px var(--deep) inset !important; -webkit-text-fill-color: var(--text) !important; caret-color: var(--text); transition: background-color 9999s; }
 input[readonly] { background: var(--raised); color: var(--muted); }
 input[type="checkbox"] { width: 18px; min-height: 18px; accent-color: var(--brass); }
 .check { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
@@ -238,7 +245,7 @@ input[type="checkbox"] { width: 18px; min-height: 18px; accent-color: var(--bras
 .field-row input { flex: 1; min-width: 0; }
 
 /* Mixer */
-.mixer { max-width: 800px; }
+.mixer { max-width: 800px; margin-inline: auto; }
 .mixer-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
 .title-field { flex: 1; min-width: 240px; }
 .title-field label { display: block; font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -288,7 +295,7 @@ textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
 .danger-zone { margin-top: 24px; }
 
 /* Library */
-.library { max-width: 940px; }
+.library { max-width: 940px; margin-inline: auto; }
 .toolbar { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 .search { flex: 1; min-width: 220px; }
 .sort { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
