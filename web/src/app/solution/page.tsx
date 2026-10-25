@@ -1,5 +1,19 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { SimplePage } from "@/components/site-chrome";
+
+export const metadata: Metadata = { title: "How it works" };
+
+const steps = [
+  ["Add your tracks", "Upload a beat and your vocal. Add doubles, backing vocals, ad-libs or instruments as separate files for more control."],
+  ["Describe the sound", "Name the style and what you want to hear: “afrobeats, vocal upfront, light autotune, some reverb”."],
+  ["Listen and refine", "Get a free 30-second preview. Ask for changes in a short note; every version is kept."],
+  ["Download", "When it sounds right, get the full-length track as a WAV file ready for streaming."],
+];
 
 export default function SolutionPage() {
-  return <main className="simple-page"><header className="simple-nav"><Link className="brand" href="/"><span className="brand-mark"><i/><i/><i/><i/><i/></span><span>fastmix<span className="brand-dot">.</span></span></Link><Link href="/">Home</Link></header><section className="simple-content"><span className="kicker">A WORKFLOW BUILT AROUND YOU</span><h1>Start with the sound<br/><em>you have in mind.</em></h1><p className="simple-lede">FastMix brings source tracks, creative direction, and mix versions into one focused workspace. Start small, listen closely, and keep refining.</p><div className="solution-grid"><article><span>01</span><h2>Bring the pieces</h2><p>Organize beats, vocals, doubles, harmonies, and instruments in one session.</p></article><article><span>02</span><h2>Describe the feeling</h2><p>Write your mix direction in plain language and refine it as you listen.</p></article><article><span>03</span><h2>Keep the versions</h2><p>Compare takes, revisit a prompt, and keep your creative decisions together.</p></article></div><Link className="button button-lime" href="/signup">Open the studio <span>↗</span></Link></section></main>;
+  return <SimplePage label="How it works" title="From rough tracks to a finished mix" intro="FastMix brings your tracks, your direction and every version of the mix into one place.">
+    <ol className="steps steps-stacked">{steps.map(([title, text], index) => <li key={title}><span className="step-number">{index + 1}</span><h3>{title}</h3><p>{text}</p></li>)}</ol>
+    <p className="page-actions"><Link className="btn btn-primary" href="/signup">Start a free session</Link></p>
+  </SimplePage>;
 }

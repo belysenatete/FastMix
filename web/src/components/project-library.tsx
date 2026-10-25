@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Transport from "@/components/transport";
 import { createProject, listProjects, ProjectRecord, removeProject, setActiveProjectId } from "@/lib/projects";
 
 type SortOrder = "newest" | "oldest" | "name-asc" | "name-desc";
@@ -95,19 +96,37 @@ export default function ProjectLibrary() {
     finally { setBusyVersion(""); }
   }
 
-  return <div className="library-page">
-    <div className="workspace-heading"><div><span className="studio-kicker">YOUR WORKSPACE <i>/</i> LIBRARY</span><h1>Keep the good takes close.</h1><p>Your sessions, versions, and next ideas all in one place.</p></div><button className="studio-button studio-button-lime" onClick={startSession}>＋ New session</button></div>
-    {notice && <div className="inline-notice" role="status">{notice}<button aria-label="Dismiss" onClick={() => setNotice("")}>×</button></div>}
-    <div className="library-toolbar"><label className="library-search"><span>⌕</span><input aria-label="Search sessions" placeholder="Search your sessions…" value={query} onChange={(event) => setQuery(event.target.value)} /><kbd>⌘ K</kbd></label><label className="sort-select"><span>Sort by</span><select value={sort} onChange={(event) => setSort(event.target.value as SortOrder)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name-asc">Name A-Z</option><option value="name-desc">Name Z-A</option></select></label></div>
-    {!ready ? <div className="library-loading">Loading your sessions…</div> : visibleProjects.length ? <div className="project-grid">{visibleProjects.map((project) => {
+  const statusLabel: Record<string, string> = { draft: "Draft", ready: "Ready", queued: "Queued", processing: "Mixing", completed: "Ready to play", failed: "Failed" };
+
+  return <div className="library">
+    <div className="page-head"><div><h1>Library</h1><p>Every session and every version you have made.</p></div><button className="btn btn-primary" onClick={startSession}>New session</button></div>
+    {notice && <div className="notice-bar" role="status"><span>{notice}</span><button aria-label="Dismiss" onClick={() => setNotice("")}>×</button></div>}
+    <div className="toolbar"><label className="search"><span className="visually-hidden">Search sessions</span><input type="search" placeholder="Search sessions" value={query} onChange={(event) => setQuery(event.target.value)} /></label><label className="sort"><span>Sort</span><select value={sort} onChange={(event) => setSort(event.target.value as SortOrder)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option></select></label></div>
+    {!ready ? <p className="hint">Loading your sessions…</p> : visibleProjects.length ? <ul className="session-list">{visibleProjects.map((project) => {
       const trackCount = Math.max(project.tracks.length, project.trackCount || 0);
-      const latest = project.jobs[0];
-      return <article key={project.id} className="project-card">
-        <button className="project-card-open" onClick={() => openProject(project)}><div className="project-art"><div className="project-art-ring"><span>FM</span></div><div className="project-art-wave">{Array.from({length:42},(_,i)=><i key={i} style={{height:`${12 + Math.abs(Math.sin(i*1.4 + project.title.length))*75}%`}} />)}</div><span className="project-kind">{project.projectType === "master" ? "MASTER" : "MIX SESSION"}</span></div><div className="project-card-body"><div className="project-card-top"><h2>{project.title || "Untitled session"}</h2><span className={`project-status status-${latest?.status || project.status}`}>{latest?.status || project.status}</span></div><p>{trackCount} {trackCount === 1 ? "track" : "tracks"}{project.prompt ? ` · ${project.prompt.slice(0,62)}${project.prompt.length > 62 ? "…" : ""}` : " · Add a mix direction"}</p><div className="project-card-meta"><span>{dateLabel(project.updatedAt)}</span><span>Open session <b>↗</b></span></div></div></button>
-        <button className="project-delete" aria-label={`Delete ${project.title}`} onClick={() => void deleteProject(project)}>···</button>
-        {project.jobs.length > 0 && <div className="version-history"><button className="version-history-toggle" aria-expanded={expanded === project.id} onClick={() => setExpanded(expanded === project.id ? null : project.id)}>Versions <span>{project.jobs.length.toString().padStart(2,"0")}</span><i>{expanded === project.id ? "−" : "+"}</i></button>{expanded === project.id && <div className="version-list">{project.jobs.map((version,index) => <div className="version-row" key={version.id}><div className="version-row-title"><b>Version {project.jobs.length-index}{version.render === "full" ? " · Full track" : version.processor === "roex_tonn" ? " · AI preview" : ""}</b><span className={`project-status status-${version.status}`}>{version.status}</span></div><small>{dateLabel(version.created_at)}{version.output_format ? ` · ${version.output_format.toUpperCase()}` : ""}</small>{version.refinement && <small className="version-note">“{version.refinement}”</small>}{version.summary && <small>{version.summary}</small>}{version.status === "completed" && <div className="version-actions"><button disabled={busyVersion === version.id} onClick={() => void loadPlayer(project.id,version.id)}>{busyVersion === version.id ? "Loading…" : "Play"}</button><button disabled={busyVersion === version.id} onClick={() => void download(project.id,version.id)}>Download</button></div>}{audio?.projectId === project.id && audio.jobId === version.id && <audio className="version-audio" controls autoPlay src={audio.url} aria-label={`Play preview version ${project.jobs.length-index}`} />}{version.status === "failed" && <span className="version-error">Preview processing failed</span>}</div>)}</div>}</div>}
-      </article>;
-    })}</div> : <div className="library-empty"><div className="empty-library-art"><span className="brand-mark"><i/><i/><i/><i/><i/></span></div><span className="studio-kicker">YOUR NEXT TAKE IS WAITING</span><h2>{query ? "No sessions match that search." : "Nothing in the library yet."}</h2><p>{query ? "Try another title or clear the search." : "Start a session and your work will stay together here."}</p>{query ? <button className="studio-button studio-button-outline" onClick={() => setQuery("")}>Clear search</button> : <button className="studio-button studio-button-lime" onClick={startSession}>＋ Start a new session</button>}</div>}
-    <p className="library-storage-note">Sessions and audio files are private to your account. Local preview details are also cached in this browser.</p>
+      const status = project.jobs[0]?.status || project.status;
+      const open = expanded === project.id;
+      return <li key={project.id} className="session-row">
+        <div className="session-main">
+          <button className="session-title" onClick={() => openProject(project)}>{project.title || "Untitled session"}</button>
+          <p className="session-meta">{project.projectType === "master" ? "Master" : "Mix"} · {trackCount} {trackCount === 1 ? "track" : "tracks"} · {dateLabel(project.updatedAt)}{project.prompt ? ` · “${project.prompt.slice(0, 60)}${project.prompt.length > 60 ? "…" : ""}”` : ""}</p>
+        </div>
+        <span className={`status status-${status}`}>{statusLabel[status] || status}</span>
+        <div className="session-actions">
+          <button className="btn btn-secondary btn-small" onClick={() => openProject(project)}>Open</button>
+          {project.jobs.length > 0 && <button className="btn btn-ghost btn-small" aria-expanded={open} onClick={() => setExpanded(open ? null : project.id)}>{open ? "Hide versions" : `Versions (${project.jobs.length})`}</button>}
+          <button className="btn-text btn-danger" aria-label={`Delete ${project.title}`} onClick={() => void deleteProject(project)}>Delete</button>
+        </div>
+        {open && <ol className="versions" reversed>{project.jobs.map((version, index) => <li key={version.id} className="version-item">
+          <div className="version-line"><b>Version {project.jobs.length - index}</b><span className="tag">{version.render === "full" ? "Full track" : version.processor === "roex_tonn" ? "AI preview" : "Local preview"}</span><span className={`status status-${version.status}`}>{statusLabel[version.status] || version.status}</span><span className="hint">{dateLabel(version.created_at)}{version.output_format ? ` · ${version.output_format.toUpperCase()}` : ""}</span></div>
+          {version.refinement && <p className="version-meta">Your note: “{version.refinement}”</p>}
+          {version.summary && <p className="version-meta">Settings: {version.summary}</p>}
+          {version.status === "completed" && <div className="button-row"><button className="btn btn-secondary btn-small" disabled={busyVersion === version.id} onClick={() => void loadPlayer(project.id, version.id)}>{busyVersion === version.id ? "Loading…" : "Play"}</button><button className="btn btn-ghost btn-small" disabled={busyVersion === version.id} onClick={() => void download(project.id, version.id)}>Download</button></div>}
+          {audio?.projectId === project.id && audio.jobId === version.id && <Transport src={audio.url} autoPlay label={`Version ${project.jobs.length - index} of ${project.title}`} />}
+          {version.status === "failed" && <p className="error-text">This version failed. Open the session to retry.</p>}
+        </li>)}</ol>}
+      </li>;
+    })}</ul> : <div className="empty"><h2>{query ? "No sessions match that search." : "No sessions yet."}</h2><p>{query ? "Try another name or clear the search." : "Start a session and every version you make will appear here."}</p>{query ? <button className="btn btn-secondary" onClick={() => setQuery("")}>Clear search</button> : <button className="btn btn-primary" onClick={startSession}>Start a session</button>}</div>}
+    <p className="fine-print">Sessions and audio are private to your account.</p>
   </div>;
 }

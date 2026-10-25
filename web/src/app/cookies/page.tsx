@@ -1,2 +1,12 @@
-import Link from "next/link";
-export default function CookiesPage(){return <main className="simple-page"><header className="simple-nav"><Link href="/" className="brand"><span className="brand-mark"><i/><i/><i/><i/><i/></span><span>fastmix<span className="brand-dot">.</span></span></Link><Link href="/">Home</Link></header><section className="simple-content"><span className="kicker">COOKIES</span><h1>Cookie information</h1><p className="simple-lede">The local preview uses a short-lived, httpOnly cookie to remember the development demo session. Production analytics and marketing cookies are not configured.</p></section></main>}
+import type { Metadata } from "next";
+import { SimplePage } from "@/components/site-chrome";
+
+export const metadata: Metadata = { title: "Cookies" };
+
+export default function CookiesPage() {
+  return <SimplePage label="Cookies" title="Cookie information" intro="FastMix only uses the cookies Clerk needs to keep you signed in.">
+    <div className="prose">
+      <p>The studio also remembers your recent session details in your browser so it opens where you left off. No analytics or advertising cookies are set.</p>
+    </div>
+  </SimplePage>;
+}

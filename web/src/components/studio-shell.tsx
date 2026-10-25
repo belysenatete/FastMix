@@ -2,53 +2,72 @@
 
 import Link from "next/link";
 import { useClerk } from "@clerk/nextjs";
-import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { ReactNode, useEffect, useRef, useState } from "react";
 
-const navigation = [
-  { href: "/studio/mixer", icon: "＋", label: "New session" },
-  { href: "/studio/library", icon: "▦", label: "My library" },
-  { href: "/studio/affiliate", icon: "↗", label: "Affiliate" },
-  { href: "/studio/guide", icon: "✳", label: "Sound guide" },
+const tabs = [
+  { href: "/studio/mixer", label: "Mix" },
+  { href: "/studio/library", label: "Library" },
+  { href: "/studio/guide", label: "Guide" },
 ];
 
 export default function StudioShell({ children, name, email }: { children: ReactNode; name: string; email: string }) {
   const pathname = usePathname();
-  const router = useRouter();
   const clerk = useClerk();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [displayName, setDisplayName] = useState(name);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const syncProfile = () => setDisplayName(localStorage.getItem("fastmix.profile.name") || name);
     syncProfile();
     window.addEventListener("fastmix-profile", syncProfile);
     return () => window.removeEventListener("fastmix-profile", syncProfile);
   }, [name]);
-  const sectionName = pathname.includes("library") ? "MY LIBRARY" : pathname.includes("guide") ? "SOUND GUIDE" : pathname.includes("affiliate") ? "AFFILIATE" : pathname.includes("billing") ? "PLAN & BILLING" : pathname.includes("settings") ? "SETTINGS" : pathname.includes("support") ? "SUPPORT" : "YOUR STUDIO";
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
+    const closeOutside = (event: MouseEvent) => { if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false); };
+    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("mousedown", closeOutside);
+    return () => { window.removeEventListener("keydown", closeOnEscape); window.removeEventListener("mousedown", closeOutside); };
+  }, [menuOpen]);
+
   const initials = displayName.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase() || "FM";
 
-  async function signOut() {
-    await clerk.signOut({ redirectUrl: "/login" });
-  }
-
   async function enableNotifications() {
+    setMenuOpen(false);
     if (!("Notification" in window)) { setNotice("This browser does not support desktop notifications."); return; }
     const permission = await Notification.requestPermission();
     setNotice(permission === "granted" ? "Notifications are on for this browser." : "Notification permission was not granted.");
   }
 
-  return <div className="studio-app">
-    <aside className="studio-sidebar">
-      <Link className="brand studio-brand" href="/studio/mixer"><span className="brand-mark"><i/><i/><i/><i/><i/></span><span>fastmix<span className="brand-dot">.</span></span></Link>
-      <div className="sidebar-eyebrow">WORKSPACE</div>
-      <nav className="studio-navigation" aria-label="Studio navigation">{navigation.map((item) => <Link key={item.href} href={item.href} className={`studio-nav-item${pathname === item.href || (item.href !== "/studio/mixer" && pathname.startsWith(item.href)) ? " studio-nav-active" : ""}`}><span>{item.icon}</span>{item.label}{item.href === "/studio/mixer" && <b>⌘ K</b>}</Link>)}</nav>
-      <div className="sidebar-bottom"><div className="preview-badge"><i /> LOCAL PREVIEW</div><button className="side-help" onClick={() => router.push("/studio/support")}><span>?</span> Need a hand?</button><div className="sidebar-user"><div className="user-avatar">{initials}</div><div><b>{displayName}</b><small>Artist workspace</small></div><button aria-label="Open account menu" onClick={() => setMenuOpen(!menuOpen)}>···</button></div></div>
-    </aside>
-    <div className="studio-main">
-      <header className="studio-topbar"><div className="studio-crumb"><span>FASTMIX</span><i>/</i><b>{sectionName}</b></div><div className="studio-top-actions"><button className="notification-button" onClick={enableNotifications}><span>♧</span> Notifications</button><div className="account-wrap"><button className="account-button" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><span className="user-avatar">{initials}</span><span className="account-name">{displayName}</span><span className="chevron">⌄</span></button>{menuOpen && <div className="account-menu"><div className="account-menu-user"><b>{displayName}</b><small>{email}</small></div><Link href="/studio/billing" onClick={() => setMenuOpen(false)}>Plan &amp; Billing</Link><Link href="/studio/settings" onClick={() => setMenuOpen(false)}>Settings</Link><Link href="/studio/support" onClick={() => setMenuOpen(false)}>Support</Link><Link href="/studio/guide" onClick={() => setMenuOpen(false)}>Language · English</Link><button onClick={signOut}>Sign out</button></div>}</div></div></header>
-      {notice && <div className="studio-toast" role="status"><span>{notice}</span><button aria-label="Dismiss notification message" onClick={() => setNotice("")}>×</button></div>}
-      <div className="studio-content">{children}</div>
-    </div>
+  return <div className="studio">
+    <header className="studio-bar">
+      <div className="container studio-bar-inner">
+        <Link className="wordmark" href="/studio/mixer" aria-label="FastMix studio">Fast<b>mix</b></Link>
+        <nav className="studio-tabs" aria-label="Studio">
+          {tabs.map((tab) => <Link key={tab.href} href={tab.href} aria-current={pathname.startsWith(tab.href) ? "page" : undefined}>{tab.label}</Link>)}
+        </nav>
+        <div className="account" ref={menuRef}>
+          <button className="account-button" aria-expanded={menuOpen} aria-haspopup="menu" onClick={() => setMenuOpen(!menuOpen)}>
+            <span className="avatar" aria-hidden="true">{initials}</span><span className="account-name">{displayName}</span><span aria-hidden="true">▾</span>
+          </button>
+          {menuOpen && <div className="account-menu" role="menu">
+            <p className="account-who"><b>{displayName}</b><span>{email}</span></p>
+            <Link role="menuitem" href="/studio/settings" onClick={() => setMenuOpen(false)}>Settings</Link>
+            <Link role="menuitem" href="/studio/billing" onClick={() => setMenuOpen(false)}>Plan &amp; billing</Link>
+            <Link role="menuitem" href="/studio/support" onClick={() => setMenuOpen(false)}>Help &amp; support</Link>
+            <Link role="menuitem" href="/studio/affiliate" onClick={() => setMenuOpen(false)}>Affiliate program</Link>
+            <button role="menuitem" onClick={() => void enableNotifications()}>Turn on notifications</button>
+            <button role="menuitem" onClick={() => void clerk.signOut({ redirectUrl: "/login" })}>Sign out</button>
+          </div>}
+        </div>
+      </div>
+    </header>
+    {notice && <div className="container"><div className="notice-bar" role="status"><span>{notice}</span><button aria-label="Dismiss" onClick={() => setNotice("")}>×</button></div></div>}
+    <main className="container studio-content">{children}</main>
   </div>;
 }

@@ -1,2 +1,13 @@
-import Link from "next/link";
-export default function TermsPage(){return <main className="simple-page"><header className="simple-nav"><Link href="/" className="brand"><span className="brand-mark"><i/><i/><i/><i/><i/></span><span>fastmix<span className="brand-dot">.</span></span></Link><Link href="/">Home</Link></header><section className="simple-content"><span className="kicker">TERMS</span><h1>Terms of service</h1><p className="simple-lede">FastMix is a local product preview. No paid service or production audio processing is offered through this build. Final terms will be published before launch.</p><p className="legal-note">Preview accounts and project data in this version may be stored locally in your browser. Do not upload confidential or irreplaceable audio.</p></section></main>}
+import type { Metadata } from "next";
+import { SimplePage } from "@/components/site-chrome";
+
+export const metadata: Metadata = { title: "Terms" };
+
+export default function TermsPage() {
+  return <SimplePage label="Terms" title="Terms of service" intro="FastMix is a product preview. Paid plans are not offered yet.">
+    <div className="prose">
+      <p>Only upload audio you own or have permission to use. Keep your own copies of important recordings; preview data may be reset.</p>
+      <p className="notice">Final terms will be published before launch.</p>
+    </div>
+  </SimplePage>;
+}

@@ -1,2 +1,13 @@
-import Link from "next/link";
-export default function PrivacyPage(){return <main className="simple-page"><header className="simple-nav"><Link href="/" className="brand"><span className="brand-mark"><i/><i/><i/><i/><i/></span><span>fastmix<span className="brand-dot">.</span></span></Link><Link href="/">Home</Link></header><section className="simple-content"><span className="kicker">PRIVACY</span><h1>Your work stays yours.</h1><p className="simple-lede">FastMix uses Clerk to manage account sign-in. This local preview stores project information in its configured development database and audio storage.</p><p className="legal-note">A complete privacy notice covering audio processing, retention, deletion, and providers will be published before launch.</p></section></main>}
+import type { Metadata } from "next";
+import { SimplePage } from "@/components/site-chrome";
+
+export const metadata: Metadata = { title: "Privacy" };
+
+export default function PrivacyPage() {
+  return <SimplePage label="Privacy" title="Your music stays yours" intro="FastMix uses Clerk to manage sign-in. Your sessions and audio are private to your account, and you can delete them from your library at any time.">
+    <div className="prose">
+      <p>When you request an AI mix or master, your audio is sent to our processing partner, RoEx, to create the result.</p>
+      <p className="notice">A complete privacy notice covering audio processing, retention, deletion and providers will be published before launch.</p>
+    </div>
+  </SimplePage>;
+}
