@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import PlanPicker from "@/components/plan-picker";
 import { Locale, SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { formatClock, LevelMeter, useAudioLevel } from "@/components/transport";
 
@@ -32,10 +33,7 @@ const copy = {
     soundTitle: "Sound",
     sound: ["Vocal louder or quieter", "More or less reverb", "Subtle or hard autotune", "Autotune in a key", "Louder and punchier", "More dynamic"],
     pricingLabel: "Pricing",
-    pricingTitle: "Try it free. Pay when it's part of your process.",
-    starter: { name: "Starter", price: "Free", items: ["Unlimited 30-second previews", "Refinement notes and version history", "Sound guide"], cta: "Start a free session" },
-    studio: { name: "Studio", price: "Coming soon", items: ["Full-length mixes and masters", "Monthly or lifetime plans", "WAV downloads"], cta: "Join the early list" },
-    pricingNote: "Plans are announced before launch. No payment is collected during the preview.",
+    pricingTitle: "Less than one studio session.",
     faqLabel: "Questions",
     faqTitle: "Good to know",
     faqs: [
@@ -75,10 +73,7 @@ const copy = {
     soundTitle: "Son",
     sound: ["Voix plus forte ou plus basse", "Plus ou moins de réverbe", "Autotune léger ou fort", "Autotune dans une tonalité", "Plus fort, plus de punch", "Plus dynamique"],
     pricingLabel: "Tarifs",
-    pricingTitle: "Essayez gratuitement. Payez quand ça fait partie de votre routine.",
-    starter: { name: "Découverte", price: "Gratuit", items: ["Aperçus de 30 secondes illimités", "Notes d'ajustement et historique des versions", "Guide du son"], cta: "Commencer gratuitement" },
-    studio: { name: "Studio", price: "Bientôt", items: ["Mixes et masters complets", "Formules mensuelle ou à vie", "Téléchargement en WAV"], cta: "Rejoindre la liste" },
-    pricingNote: "Les offres seront annoncées avant le lancement. Aucun paiement n'est demandé pendant l'aperçu.",
+    pricingTitle: "Moins cher qu'une session en studio.",
     faqLabel: "Questions",
     faqTitle: "Bon à savoir",
     faqs: [
@@ -223,15 +218,7 @@ export default function LandingPage() {
         <div className="container">
           <p className="label">{t.pricingLabel}</p>
           <h2>{t.pricingTitle}</h2>
-          <div className="plan-grid">
-            {[t.starter, t.studio].map((plan, index) => <article key={plan.name} className={`plan${index === 1 ? " plan-featured" : ""}`}>
-              <h3>{plan.name}</h3>
-              <p className="plan-price">{plan.price}</p>
-              <ul>{plan.items.map((item) => <li key={item}>{item}</li>)}</ul>
-              <Link className={`btn ${index === 1 ? "btn-primary" : "btn-secondary"}`} href="/signup">{plan.cta}</Link>
-            </article>)}
-          </div>
-          <p className="fine-print">{t.pricingNote}</p>
+          <PlanPicker locale={locale} />
         </div>
       </section>
 

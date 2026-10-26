@@ -1,6 +1,6 @@
 # Project tracker
 
-Last updated: 2026-10-23
+Last updated: 2026-10-26
 
 ## Current status
 
@@ -27,7 +27,20 @@ Last updated: 2026-10-23
 | 9. Iterate from usage | Complete (provisional) | Prioritized evidence-labeled backlog and telemetry/review plan are in [nextReleaseBacklog.md](nextReleaseBacklog.md). No user usage data exists; reprioritize after a staging/preview cohort. |
 
 - 2026-10-11: Added optional RoEx Tonn AI preview integration for multitrack mixing and single-file mastering. Jobs select RoEx only when `ROEX_API_KEY` is configured and otherwise keep the existing FFmpeg path. The integration prepares 44.1 kHz WAV inputs, maps track categories and a small set of prompt genre/reverb words, polls Tonn, and downloads only previews (no billable final mix/master endpoint). The provider key is not configured, so real external audio processing is not verified. Before enabling, note that user tracks are uploaded to RoEx; its published security page says temporary audio/previews are deleted after processing but does not publish a DPA/SLA or metadata retention duration for self-serve accounts. Compose configuration, worker Python compile, web lint, and optimized production build passed. Updated API and processor containers are running, and the API health endpoint returned HTTP 200.
+## Pricing model
+
+Plans live in `web/src/lib/plans.ts`. Prices follow Easymix (Pro €34.99/mo or €220 lifetime, Artist €49.99/mo or €310 lifetime) restated in USD; allowances are sized so a plan keeps its margin when fully used.
+
+- Cost of one paid full-length track: RoEx 250 credits = $2.50 on the $10 pack, $2.00 on the $80 pack (mastering 220 credits). Previews are free while the RoEx balance is positive. Stripe: 2.9% + $0.30 per charge (+1.5% for international cards). Hosting/storage/auth share assumed at $3 per active paid user per month.
+- Pro $34.99/mo, 6 tracks: worst case $1.31 Stripe + $3 hosting + $15 RoEx → $15.68 margin (45%); $18.68 (53%) on the large RoEx pack.
+- Artist $49.99/mo, 10 tracks: worst case $1.75 + $3 + $25 → $20.24 margin (40%); $25.24 (50%) on the large pack.
+- Lifetime Pro $219 (2 tracks/mo) and Artist $309 (4 tracks/mo): with every track used, the payment covers about 26 and 23 months of costs. Typical use is well below the cap, but lifetime plans are an open-ended liability: limit how many are sold and review costs after launch.
+- Each new full-length version counts as a track; re-downloads and previews don't. Unused tracks don't roll over.
+- Not yet built: Stripe checkout and webhooks, per-plan monthly quotas, and MP3 export for Pro (full tracks currently download as WAV).
+
 ## Work log
+
+- 2026-10-26: Legal and pricing. Rewrote Terms, Privacy and Cookie pages modeled on Easymix's terms with French/EU-specific clauses dropped (Consumer Code withdrawal right, French law/courts, CNIL) and US-style clauses compared against CompSniper (as-is disclaimer, 3-month liability cap, auto-renewal disclosure, generic governing law, data retention, no sale of data) plus a DMCA notice process. Operator set to Bluvera LLC in `web/src/lib/company.ts`; support and privacy inboxes are still example addresses. Cookie page lists only what the app actually sets (Clerk session cookies, `fastmix.profile.*` local storage). Added Pro/Artist monthly and lifetime plans (see Pricing model) to the landing page, pricing page and billing screen with a monthly/lifetime toggle. Lint and type check pass; pages verified at 1280 and 390 px with no overflow or page errors. The legal text is a template and needs review by a lawyer before launch.
 
 - 2026-10-25: UI redesign. Measured competitor palettes from their stylesheets (Easymix, LANDR, eMastered, Masterchannel, BandLab, Cryo Mix, Kits.ai, RoEx): bright blues/cyans/mints, violets/pinks, bright orange/red and neon green on black or white. A first light "olive & clay" pass was rejected by the user as not feeling like a studio; three studio directions were mocked up (`.tmp/design-options.html`) and the user chose "analog console" with slightly smaller type. New design: graphite panels, brass controls, oxide-red record actions, Barlow / Barlow Condensed / IBM Plex Mono, all text pairs checked for WCAG AA. Studio uses plain-text tabs and an account menu; the mixer is four numbered steps with quick phrases; versions show real settings as knobs; a shared transport player (clock, seek, live Web Audio level meter, verified moving with real audio) replaces native players; library is a list; public pages share one header/footer; fictional testimonials and outdated cookie/FAQ copy removed. Verified desktop and 390px for public and signed-in studio pages (no overflow, no page errors); lint, type check and build pass.
 
