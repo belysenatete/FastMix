@@ -72,7 +72,7 @@ export default function AccountHub({ email }: { email: string }) {
     {feedback}
     <div className="card-grid">
       <Card><h2>Current plan</h2><p className="plan-price">Starter · Free</p><p>Unlimited 30-second previews. No payment method is attached.</p></Card>
-      <Card><h2>Pro and Artist</h2><p className="plan-price">From {formatPrice(plans[0].price.monthly)}/mo</p><p>{plans.map((plan) => `${plan.name}: ${formatPrice(plan.price.monthly)}/mo for ${plan.tracks.monthly} full-length tracks, or ${formatPrice(plan.price.lifetime)} once for ${plan.tracks.lifetime} a month.`).join(" ")} Checkout opens at launch.</p><Link className="text-link" href="/pricing">Compare plans →</Link></Card>
+      <Card><h2>Pro and Artist</h2><p className="plan-price">From {formatPrice(plans[0].price.monthly)}/mo</p><p>{plans.map((plan) => `${plan.name}: ${plan.tracks} full-length tracks a month for ${formatPrice(plan.price.monthly)}/mo or ${formatPrice(plan.price.yearly)}/yr.`).join(" ")} Checkout opens at launch.</p><Link className="text-link" href="/pricing">Compare plans →</Link></Card>
       <Card><h2>Invoices</h2><p>No invoices yet.</p></Card>
     </div>
   </>;

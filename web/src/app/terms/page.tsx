@@ -32,15 +32,14 @@ export default function TermsPage() {
       <h2 id="plans">4. Plans, billing and renewal</h2>
       <ul>
         <li><b>Starter</b> is free and includes 30-second previews. We may apply fair-use limits to prevent abuse.</li>
-        <li><b>Monthly plans</b> are billed in advance in US dollars and <b>renew automatically every month</b> at the price shown at checkout until you cancel. Payments are processed by Stripe, and by subscribing you authorize recurring charges to your payment method.</li>
-        <li><b>Lifetime plans</b> are a single payment for access to the plan&apos;s features and monthly allowance for as long as {product} operates the service. &quot;Lifetime&quot; refers to the life of the service, not of the buyer. Lifetime plans can&apos;t be transferred.</li>
+        <li><b>Monthly and yearly plans</b> are billed in advance in US dollars and <b>renew automatically</b> at the end of each month or year, at the price shown at checkout, until you cancel. Payments are processed by Stripe, and by subscribing you authorize recurring charges to your payment method. We email a reminder before a yearly plan renews.</li>
         <li>Each plan includes a number of <b>full-length tracks</b> per calendar month, shown on the <Link href="/pricing">pricing page</Link>. Each new full-length mix or master counts as one track; previews and re-downloading a version you already rendered do not. Unused tracks don&apos;t roll over.</li>
         <li>Prices exclude any sales tax that applies where you live, which is added at checkout.</li>
-        <li>We may change prices. We will tell you at least 30 days before a new price applies to your subscription, and it will apply from your next renewal. Lifetime plans already paid for are not charged again.</li>
+        <li>We may change prices. We will tell you at least 30 days before a new price applies to your subscription, and it will apply from your next renewal.</li>
       </ul>
 
       <h2 id="cancel">5. Cancellation</h2>
-      <p>You can cancel a monthly plan at any time from Plan &amp; billing in the studio or by emailing <a href={`mailto:${supportEmail}`}>{supportEmail}</a>. Cancellation takes effect at the end of the current billing period, and you keep access until then. Your account then returns to Starter, and your library stays available.</p>
+      <p>You can cancel a monthly or yearly plan at any time from Plan &amp; billing in the studio or by emailing <a href={`mailto:${supportEmail}`}>{supportEmail}</a>. Cancellation takes effect at the end of the current billing period, and you keep access until then. Your account then returns to Starter, and your library stays available.</p>
 
       <h2 id="refunds">6. Refunds</h2>
       <p>You can preview results for free before paying, so payments are non-refundable once you have used a paid plan (for example, rendered a full-length track), except where the law requires a refund.</p>
@@ -77,7 +76,7 @@ export default function TermsPage() {
       <p>You agree to cover {legalName}&apos;s reasonable costs from claims by others that arise from content you upload or your breach of these terms.</p>
 
       <h2 id="termination">13. Termination</h2>
-      <p>You can close your account at any time by contacting us. We may suspend or close an account that breaks these terms, puts the service or other users at risk, or where the law requires it. If we close a paid account without cause, we will refund the unused part of a monthly subscription. Sections 6, 7, 11, 12 and 14 continue after termination.</p>
+      <p>You can close your account at any time by contacting us. We may suspend or close an account that breaks these terms, puts the service or other users at risk, or where the law requires it. If we close a paid account without cause, we will refund the unused part of your subscription. Sections 6, 7, 11, 12 and 14 continue after termination.</p>
 
       <h2 id="law">14. Governing law</h2>
       <p>These terms are governed by the laws of the United States and of the state where {legalName} is organized, without regard to conflict-of-laws rules. Before filing a claim, contact us so we can try to resolve it informally within 30 days. If we can&apos;t, disputes go to the competent courts of that state, unless the consumer law where you live gives you the right to bring a claim locally.</p>

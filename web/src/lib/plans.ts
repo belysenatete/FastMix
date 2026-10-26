@@ -6,7 +6,7 @@
  * and a hosting share, so a plan keeps a margin even when its allowance is fully used.
  * The cost math is recorded in projectTracker.md under "Pricing model"; update both together.
  */
-export type Billing = "monthly" | "lifetime";
+export type Billing = "monthly" | "yearly";
 type Text = { en: string; fr: string };
 
 export type Plan = {
@@ -14,8 +14,8 @@ export type Plan = {
   name: string;
   popular?: boolean;
   price: Record<Billing, number>;
-  /** Full-length tracks (mix or master) included each calendar month. */
-  tracks: Record<Billing, number>;
+  /** Full-length tracks (mix or master) included each calendar month, on either billing period. */
+  tracks: number;
   downloads: Text;
   features: Text[];
 };
@@ -31,8 +31,8 @@ export const plans: Plan[] = [
   {
     id: "pro",
     name: "Pro",
-    price: { monthly: 34.99, lifetime: 219 },
-    tracks: { monthly: 6, lifetime: 2 },
+    price: { monthly: 34.99, yearly: 349 },
+    tracks: 6,
     downloads: { en: "MP3 downloads", fr: "Téléchargement en MP3" },
     features: shared,
   },
@@ -40,8 +40,8 @@ export const plans: Plan[] = [
     id: "artist",
     name: "Artist",
     popular: true,
-    price: { monthly: 49.99, lifetime: 309 },
-    tracks: { monthly: 10, lifetime: 4 },
+    price: { monthly: 49.99, yearly: 499 },
+    tracks: 10,
     downloads: { en: "MP3 + WAV downloads", fr: "Téléchargement en MP3 + WAV" },
     features: [...shared, { en: "Priority support", fr: "Support prioritaire" }],
   },
@@ -62,4 +62,9 @@ export function formatPrice(amount: number) {
 
 export function tracksLabel(count: number, locale: "en" | "fr") {
   return locale === "fr" ? `${count} titres complets par mois` : `${count} full-length tracks a month`;
+}
+
+/** Yearly price spread over twelve months, for the "per month, billed yearly" line. */
+export function monthlyEquivalent(plan: Plan) {
+  return Math.floor((plan.price.yearly / 12) * 100) / 100;
 }

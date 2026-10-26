@@ -11,8 +11,8 @@ export default function PricingPage() {
     <div className="prose legal">
       <h2>How tracks are counted</h2>
       <p>A track is one full-length mix or master that you choose to render. Previews and refinement notes are always free and never use a track. If you refine a song and render the new version in full, that counts as another track. Downloading a version you already rendered is free.</p>
-      <h2>Monthly or lifetime</h2>
-      <p>Monthly plans renew each month until you cancel and include the most tracks. A lifetime plan is a single payment for ongoing access with a smaller monthly allowance, for as long as FastMix operates. See the <Link href="/terms">Terms</Link> for cancellation and refunds.</p>
+      <h2>Monthly or yearly</h2>
+      <p>Both include the same tracks every month. Monthly plans renew each month; yearly plans are paid once a year and cost the same as ten months. Either can be cancelled at any time and stays active until the end of the period you paid for. See the <Link href="/terms">Terms</Link> for cancellation and refunds.</p>
     </div>
   </SimplePage>;
 }

@@ -158,6 +158,7 @@ button { cursor: pointer; }
 .plan h3 { font-size: 16px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .plan h3 .chip { margin-left: 10px; vertical-align: 2px; }
 .plan-price small { font-family: var(--font-body); font-size: 14px; font-weight: 400; color: var(--muted); }
+.plan-sub { margin: -10px 0 14px; font-size: 13px; color: var(--muted); }
 .plan li.plan-off { color: var(--muted); }
 .plan li.plan-off::before { content: "–"; color: var(--muted); }
 .plan ul { list-style: none; padding: 0; margin: 0 0 22px; flex: 1; }
