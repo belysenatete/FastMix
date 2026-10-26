@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import SettingsKnobs, { VersionSettings } from "@/components/settings-knobs";
+import WaitingLine from "@/components/waiting-line";
 import Transport from "@/components/transport";
 import { createProject, getActiveProjectId, listProjects, persistProject, ProjectRecord, removeProject, setActiveProjectId, TrackCategory, TrackRecord } from "@/lib/projects";
 
@@ -353,7 +354,7 @@ export default function MixerWorkspace() {
       {job && <div className={`version version-${job.status}`} aria-live="polite">
         <div className="version-head"><b>{versionHeading(job, project.projectType)}</b><span className="tag">{ai ? job.render === "full" ? "AI · full track" : "AI preview" : "Local preview"}</span></div>
         {job.refinement && <p className="version-meta">Your note: “{job.refinement}”</p>}
-        {job.settings ? <SettingsKnobs settings={job.settings} /> : job.summary && <p className="version-meta">Settings: {job.summary}</p>}
+        {job.settings ? <SettingsKnobs settings={job.settings} caption={(job.status === "queued" || job.status === "processing") ? <WaitingLine mode={master ? "master" : "mix"} autotune={Boolean(job.settings.autotune)} /> : undefined} /> : job.summary && <p className="version-meta">Settings: {job.summary}</p>}
         {(job.status === "queued" || job.status === "processing") && <div className="progress" role="progressbar" aria-valuenow={job.progress} aria-valuemin={0} aria-valuemax={100} aria-label="Processing progress"><i style={{ width: `${Math.max(4, job.progress)}%` }} /></div>}
         {completed && <>
           <p className="hint">{job.render === "full" ? "Your full-length track is ready." : ai ? "A free 30-second preview of your mix." : "Preview from FastMix's basic local engine. AI mixing starts once RoEx is connected."}</p>

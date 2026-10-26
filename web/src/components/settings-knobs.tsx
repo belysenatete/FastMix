@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 export type VersionSettings = {
   genre: string;
   loudness: "LOW" | "MEDIUM" | "HIGH";
@@ -18,7 +20,8 @@ function Knob({ label, position, value }: { label: string; position: number; val
   </div>;
 }
 
-export default function SettingsKnobs({ settings }: { settings: VersionSettings }) {
+/** `caption` replaces the style name, e.g. with status lines while the version renders. */
+export default function SettingsKnobs({ settings, caption }: { settings: VersionSettings; caption?: ReactNode }) {
   const reverbLevels = ["NONE", "LOW", "MEDIUM", "HIGH"];
   const loudnessLevels = ["LOW", "MEDIUM", "HIGH"];
   const tune = settings.autotune;
@@ -28,6 +31,6 @@ export default function SettingsKnobs({ settings }: { settings: VersionSettings 
     <Knob label="Reverb" position={reverbLevels.indexOf(settings.reverb) / 3} value={settings.reverb === "NONE" ? "Dry" : settings.reverb.charAt(0) + settings.reverb.slice(1).toLowerCase()} />
     <Knob label="Tune" position={tune ? tune.strength : 0} value={tune?.key ? `${tuneName} · ${tune.key}` : tuneName} />
     <Knob label="Loud" position={(loudnessLevels.indexOf(settings.loudness) + 1) / 3} value={settings.loudness.charAt(0) + settings.loudness.slice(1).toLowerCase()} />
-    <p className="knobs-genre">{genreName(settings.genre)}</p>
+    <p className="knobs-genre">{caption ?? genreName(settings.genre)}</p>
   </div>;
 }
