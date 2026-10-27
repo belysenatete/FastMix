@@ -9,7 +9,7 @@ const items = [
   ["How long does a mix take?", "A preview usually takes one to two minutes. Getting the full track after a preview takes a few seconds."],
   ["My vocals sound like a phone recording", "Record in a quiet room, close to the microphone, and avoid clipping. Then ask for “vocal upfront” or “warmer vocal” in your direction."],
   ["The autotune sounds robotic", "Autotune only runs when your direction asks for it. Write “subtle autotune” for natural correction or “hard autotune” for the effect, and add the key (for example “in A minor”) to keep notes in the scale."],
-  ["Can I download WAV?", "Yes. Full tracks download as WAV files, kept under −1 dBTP so they're ready for streaming platforms."],
+  ["Can I download WAV?", "Yes, on the Artist plan. Pro downloads 320 kbps MP3. Both are kept under −1 dBTP so they're ready for streaming platforms."],
   ["Can I redo a mix?", "Yes. Each note creates a new version, and earlier versions stay in your library."],
   ["My track is missing bass", "Check that the bass is in your beat file, then ask for “more low end” or “punchier” in your note."],
 ];

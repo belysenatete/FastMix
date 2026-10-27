@@ -41,6 +41,8 @@ Plans live in `web/src/lib/plans.ts`. Monthly prices follow Easymix (Pro €34.9
 
 ## Work log
 
+- 2026-10-27: MP3 export. Full tracks download as MP3 or WAV by plan (Pro MP3 only, Artist both; a lapsed account keeps MP3 of tracks it already rendered). The 320 kbps MP3 is made on first request, kept next to the WAV and removed with the session, and turned down if encoding pushes it over −1 dBTP (verified −1.0 dBTP on a hot test track; the real RoEx track measured −1.3). Mixer shows MP3/WAV buttons; public copy updated. 46 worker tests pass.
+
 - 2026-10-27: Plan limits. Added the usage ledger (migration 006), monthly full-track allowance and daily preview fair-use checks on create, refine, full render and retry, usage release on failure, `GET /api/account/usage`, the remaining-tracks line and confirm text in the mixer, and real plan and usage meters on Plan & billing. 4 new database-backed tests (rolled back); 42 worker tests pass; lint and type check pass. Also listed the session cache keys in the cookie policy.
 
 - 2026-10-26: Operator renamed to Nexora LLC. Lifetime plans replaced with yearly plans (Pro $349, Artist $499; same monthly tracks); Terms updated for yearly auto-renewal with a renewal reminder.

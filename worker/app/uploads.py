@@ -92,6 +92,8 @@ def delete_project(project_id: uuid.UUID, user_id: str = Depends(require_interna
             "SELECT o.storage_key FROM outputs o JOIN processing_jobs j ON j.id = o.job_id WHERE j.project_id = %s",
             (project_id,),
         ).fetchall()
+        # MP3 copies made on download sit next to their WAV (see jobs.ensure_mp3); removing a missing key is a no-op.
+        output_keys += [{"storage_key": item["storage_key"].rsplit(".", 1)[0] + ".mp3"} for item in output_keys if item["storage_key"].endswith(".wav")]
         client = storage_client() if track_keys or output_keys else None
         if client:
             for item in [*track_keys, *output_keys]:

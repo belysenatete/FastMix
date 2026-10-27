@@ -8,7 +8,7 @@ const steps = [
   ["Add your tracks", "Upload a beat and your vocal. Add doubles, backing vocals, ad-libs or instruments as separate files for more control."],
   ["Describe the sound", "Name the style and what you want to hear: “afrobeats, vocal upfront, light autotune, some reverb”."],
   ["Listen and refine", "Get a free 30-second preview. Ask for changes in a short note; every version is kept."],
-  ["Download", "When it sounds right, get the full-length track as a WAV file ready for streaming."],
+  ["Download", "When it sounds right, download the full-length track as MP3 or WAV, ready for streaming."],
 ];
 
 export default function SolutionPage() {

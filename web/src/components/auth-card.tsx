@@ -23,7 +23,7 @@ export default function AuthCard({ mode }: { mode: "login" | "signup" }) {
 const loginPoints = [
   ["Your sessions are waiting", "Every track, direction and version you made is saved in your library."],
   ["Pick up where you left off", "Open a session, play the latest version and refine it with a short note."],
-  ["Download when it's right", "Get the full-length track as a WAV file, ready for streaming."],
+  ["Download when it's right", "Get the full-length track as MP3 or WAV, ready for streaming."],
 ];
 const signupPoints = [
   ["Add your tracks", "A beat and your vocal are all you need."],

@@ -219,10 +219,10 @@ export default function MixerWorkspace() {
     } finally { setJobPending(false); }
   }
 
-  async function downloadOutput() {
+  async function downloadOutput(format?: "mp3" | "wav") {
     if (!project || !job) return;
     try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(project.id)}/jobs/${encodeURIComponent(job.id)}/download`);
+      const response = await fetch(`/api/projects/${encodeURIComponent(project.id)}/jobs/${encodeURIComponent(job.id)}/download${format ? `?format=${format}` : ""}`);
       const body = await response.json().catch(() => ({})) as { url?: string; detail?: string; error?: string };
       if (!response.ok || !body.url) throw new Error(body.detail || body.error || "The output download could not be prepared.");
       window.location.assign(body.url);
@@ -388,7 +388,13 @@ export default function MixerWorkspace() {
     <Step number={4} title="Download" state={completed && job?.render === "full" ? "done" : completed ? "current" : "todo"}>
       {completed && job ? <div className="button-row">
         {ai && job.render === "preview" && <button className="btn btn-primary" disabled={jobPending || fullTracksLeft === 0} onClick={() => void requestFullTrack()}>Get the full track</button>}
-        <button className="btn btn-secondary" onClick={downloadOutput}>Download {job.render === "full" ? "full track" : "this preview"} ({job.output_format?.toUpperCase() || "WAV"})</button>
+        {job.render === "full"
+          ? <>
+            <button className="btn btn-secondary" onClick={() => void downloadOutput("mp3")}>Download MP3</button>
+            {usage?.formats.includes("wav") && job.output_format === "wav" && <button className="btn btn-secondary" onClick={() => void downloadOutput("wav")}>Download WAV</button>}
+            {usage && !usage.formats.includes("wav") && <p className="hint">WAV downloads come with Artist. <Link className="text-link" href="/pricing">See plans</Link></p>}
+          </>
+          : <button className="btn btn-secondary" onClick={() => void downloadOutput()}>Download this preview ({job.output_format?.toUpperCase() || "WAV"})</button>}
         {ai && job.render === "preview" && <p className="hint">{allowanceText}</p>}
       </div> : <p className="hint">Available once a version is ready.</p>}
     </Step>

@@ -4,6 +4,11 @@ type Context = { params: Promise<{ id: string; jobId: string }> };
 
 export async function GET(request: Request, { params }: Context) {
   const { id, jobId } = await params;
-  const inline = new URL(request.url).searchParams.get("inline") === "1";
-  return proxyWorker(request, `/api/projects/${encodeURIComponent(id)}/jobs/${encodeURIComponent(jobId)}/download${inline ? "?inline=true" : ""}`, "GET");
+  const search = new URL(request.url).searchParams;
+  const query = new URLSearchParams();
+  if (search.get("inline") === "1") query.set("inline", "true");
+  const format = search.get("format");
+  if (format === "mp3" || format === "wav") query.set("format", format);
+  const suffix = query.size ? `?${query}` : "";
+  return proxyWorker(request, `/api/projects/${encodeURIComponent(id)}/jobs/${encodeURIComponent(jobId)}/download${suffix}`, "GET");
 }

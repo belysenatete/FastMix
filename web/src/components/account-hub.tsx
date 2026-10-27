@@ -26,7 +26,7 @@ const answers = [
   ["Processing is slow", "A preview usually takes one to two minutes. Large files take longer to upload."],
   ["My vocal sounds thin", "Record close to the microphone in a quiet room, then ask for “vocal upfront” or “warmer vocal”."],
   ["The vocal sounds robotic", "Write “subtle autotune” for natural correction or “no autotune” to turn it off. “Hard autotune” gives the robotic effect on purpose."],
-  ["Which format do I get?", "Full tracks download as WAV, ready for streaming platforms."],
+  ["Which format do I get?", "Pro downloads full tracks as 320 kbps MP3. Artist can download MP3 or WAV. Both are ready for streaming platforms."],
   ["How do I change a mix?", "Under step 3 in the mixer, write what should change, for example “vocal louder”. Earlier versions stay in your library."],
 ];
 
