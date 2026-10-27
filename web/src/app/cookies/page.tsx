@@ -8,6 +8,7 @@ export const metadata: Metadata = { title: "Cookie policy" };
 const cookies = [
   ["__session, __client_uat and related Clerk cookies", "Keep you signed in and protect your account", "Cookie, set by Clerk", "Session or up to 1 year"],
   ["fastmix.profile.*", "Remember your display name, language and email preference", "Browser storage", "Until you clear it"],
+  ["fastmix.projects.v1, fastmix.active-project.v1", "Keep a copy of your session list and reopen the session you last worked on", "Browser storage", "Until you clear it"],
 ];
 
 export default function CookiesPage() {
