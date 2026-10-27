@@ -1,6 +1,6 @@
 # Project tracker
 
-Last updated: 2026-10-26
+Last updated: 2026-10-27
 
 ## Current status
 
@@ -8,8 +8,8 @@ Last updated: 2026-10-26
 - **Current phase:** Phases 0–9 complete; awaiting staging and real usage evidence.
 - **Progress:** Phase 9 complete as a provisional next-release backlog. It records repository evidence, known release blockers, recommended telemetry, and a reprioritization rule. No real user data was available.
 - **Current focus:** Easymix parity for AI mixing, one step at a time (user-approved plan 2026-10-23): 1 Next.js security upgrade ✓, 2 RoEx baseline commit ✓, 3 full-length RoEx tracks ✓, 4 local autotune ✓, 5 refinement versions ✓, 6 mobile nav/text size/landing audio ✓.
-- **Next task:** Easymix-parity plan complete. When the RoEx key is approved, add it to the root `.env`, rebuild API/processor, and verify a real AI preview, full track and refinement. Remaining production blockers are in RELEASE_CHECKLIST.md (production Clerk, hosting, payments, legal copy, backups/monitoring, staging, full WCAG review).
-- **Blockers/dependencies:** Clerk development sign-up/email verification succeeded in Chromium. Restarting stale Next.js and Docker API processes fixed the studio redirect and old worker-header mismatch. The studio opens; project, track, and job endpoints work. A second verified account saw only its own session, and requests for the first account's tracks/jobs returned 404. Production Clerk instance/domain, audio processing beyond normalization, payments, hosting, retention rules, backups/restore, monitoring, and staging remain unconfigured. Full `npm audit` reports five high-severity advisories in the development-only `braces` dependency chain, with no patched version currently published; `npm audit --omit=dev` reports zero vulnerabilities. Credentials remain user-maintained in [credentials.md](credentials.md); never display their values.
+- **Next task:** Production-readiness pass of 2026-10-27 complete (plan limits, MP3 export, account deletion, RoEx protection, backups, alerts, accessibility, dependencies). Excluded by the owner for now: Stripe, production secrets, staging test, Clerk production setup, hosting. Next candidates: Stripe checkout writing `subscriptions` rows, or the local "level 1" mixing engine.
+- **Blockers/dependencies:** Owner actions: real support/privacy inboxes and the LLC's state for the legal pages, a lawyer's review, RoEx Auto Top-Up, an alert webhook URL, a daily backup schedule with off-machine copies, and a manual screen-reader pass. Production Clerk instance/domain, payments, hosting and staging remain unconfigured. Dependency audits are clean (2026-10-27). Credentials remain user-maintained in [credentials.md](credentials.md); never display their values.
 
 ## Phase status
 
