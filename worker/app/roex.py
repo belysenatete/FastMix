@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from .alerts import alert
 from .audio import LOUDNESS_TARGET_LUFS, finish_loudness, limit_true_peak
 from .direction import style_for
 from .vocals import VOCAL_CATEGORIES
@@ -82,10 +83,10 @@ def _api_request_once(path: str, payload: dict | None, method: str) -> tuple[int
         # Provider response bodies can contain diagnostics; keep them out of logs.
         if error.code == 402:
             # RoEx has no balance API, so this is the first sign the account is empty. Previews stop too.
-            logger.error("ALERT roex_credits: RoEx returned 402 for %s. Top up the RoEx account or enable Auto Top-Up.", path)
+            alert("roex_credits", f"RoEx returned 402 (out of credits) for {path}. Previews and full tracks are failing. Top up the RoEx account or enable Auto Top-Up.")
             raise RoExError("The RoEx credit balance is too low. Add credits, then retry.", "provider_credits") from error
         if error.code == 401:
-            logger.error("ALERT roex_auth: RoEx rejected the API key for %s.", path)
+            alert("roex_auth", f"RoEx rejected the API key for {path}. Check ROEX_API_KEY.")
             raise RoExError("RoEx rejected the API key. Check ROEX_API_KEY.", "provider_auth") from error
         if error.code in TRANSIENT_HTTP:
             raise _Transient(RoExError(f"RoEx Tonn request failed with HTTP {error.code}")) from error

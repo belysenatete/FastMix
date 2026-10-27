@@ -65,7 +65,7 @@ services:
     volumes:
       - ./database/migrations:/migrations:ro
     entrypoint: >-
-      /bin/sh -c 'psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/002_job_indexes.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/003_clerk_identity.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/004_full_renders.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/005_version_settings.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/006_usage.sql'
+      /bin/sh -c 'psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/002_job_indexes.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/003_clerk_identity.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/004_full_renders.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/005_version_settings.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/006_usage.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/007_ops_events.sql'
 
   api:
     build: ./worker
@@ -85,6 +85,8 @@ services:
       # Production must leave this unset (Starter) and grant plans through subscriptions.
       FASTMIX_DEFAULT_PLAN: ${FASTMIX_DEFAULT_PLAN:-artist}
       FASTMIX_PREVIEWS_PER_DAY: ${FASTMIX_PREVIEWS_PER_DAY:-40}
+      # Optional Discord or Slack incoming-webhook URL for operational alerts.
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -111,6 +113,7 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-fastmix_storage_dev_only}
       S3_BUCKET: ${S3_BUCKET:-fastmix-audio}
       ROEX_API_KEY: ${ROEX_API_KEY:-}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
     depends_on:
       db:
         condition: service_healthy

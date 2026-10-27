@@ -47,9 +47,11 @@ class ApiErrorTests(unittest.TestCase):
     def test_http_errors_map_to_safe_codes(self):
         for status, code in [(402, "provider_credits"), (401, "provider_auth"), (500, "provider_failed")]:
             error = HTTPError("https://tonn.roexaudio.com/x", status, "error", {}, io.BytesIO(b"provider detail"))
-            with mock.patch.dict(os.environ, {"ROEX_API_KEY": "test-key"}), mock.patch.object(roex, "urlopen", side_effect=error):
+            with mock.patch.dict(os.environ, {"ROEX_API_KEY": "test-key"}), mock.patch.object(roex, "urlopen", side_effect=error), \
+                    mock.patch.object(roex, "alert") as raised_alert:
                 with self.assertRaises(roex.RoExError) as raised:
                     roex._api_request("/retrieverecombine", {})
+            self.assertEqual(raised_alert.called, status in (401, 402))
             self.assertEqual(raised.exception.code, code)
             self.assertNotIn("provider detail", str(raised.exception))
 

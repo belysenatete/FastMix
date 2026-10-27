@@ -14,6 +14,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from .jobs import QUEUE_NAME
+from .alerts import HEARTBEAT_KEY, alert
 from .plans import release
 from .uploads import database_url
 from .roex import RoExError, create_full as create_roex_full, create_preview as create_roex_preview
@@ -178,9 +179,10 @@ def process_job(job_id: uuid.UUID):
     except RoExError as error:
         mark_failed(job_id, job["project_id"], error.code)
         logger.warning("RoEx %s job %s failed (%s): %s", job["render"], job_id, error.code, error)
-    except Exception:
+    except Exception as error:
         mark_failed(job_id, job["project_id"])
         logger.exception("%s processing failed for job %s", job["render"].capitalize(), job_id)
+        alert("job_crashed", f"A {job['render']} job ({job_id}) failed with an unexpected {type(error).__name__}. See the processor log.")
 
 
 def recover_stale_jobs():
@@ -201,6 +203,8 @@ def main():
     queue = redis_connection()
     while True:
         try:
+            # The API's watchdog reads this to tell a quiet processor from a dead one.
+            queue.set(HEARTBEAT_KEY, int(time.time()))
             message = queue.blpop(QUEUE_NAME, timeout=5)
             if message:
                 try:

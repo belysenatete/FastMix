@@ -28,7 +28,7 @@ This checklist reflects the current local preview. A checked code item does not 
 - [ ] Use HTTPS, private network policies, and managed PostgreSQL, Redis, and object storage with least-privilege service identities.
 - [ ] Configure storage lifecycle/retention, verify audio deletion, and document data processing and backup retention.
 - [ ] Define and test database backups, restore, migration rollback, and disaster recovery. Backup, restore check and restore drill scripts written and verified locally on 2026-10-27; still needed: a daily schedule, off-machine copies, and migration rollback steps.
-- [ ] Configure structured operational logs, error reporting, queue/worker metrics, alerts, and retention without logging private audio or credentials.
+- [ ] Configure structured operational logs, error reporting, queue/worker metrics, alerts, and retention without logging private audio or credentials. Built-in alerts, watchdog and `/ops/status` added 2026-10-27; still needed: a real webhook URL, log retention on the host, and optionally a hosted error tracker.
 - [ ] Add verified payment webhooks only after pricing, tax, refund, cancellation, and entitlement behavior are approved.
 - [ ] Finalize privacy, terms, and cookie notices with the actual company, vendors, retention, and user rights. Drafts written 2026-10-26 (operator Nexora LLC); still need real support/privacy inboxes, the operator's state of organization, RoEx data-handling confirmation, and legal review.
 - [ ] Review WCAG 2.2 AA with keyboard and assistive technology at mobile and desktop sizes.

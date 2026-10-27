@@ -89,6 +89,16 @@ CREATE TABLE IF NOT EXISTS usage_events (
 );
 CREATE INDEX IF NOT EXISTS usage_events_user_kind_time ON usage_events(user_id, kind, created_at);
 
+-- Operational alerts (see migrations/007_ops_events.sql).
+CREATE TABLE IF NOT EXISTS ops_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code TEXT NOT NULL,
+  message TEXT NOT NULL CHECK (char_length(message) <= 1000),
+  notified BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ops_events_code_time ON ops_events(code, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
