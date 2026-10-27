@@ -19,7 +19,7 @@ This checklist reflects the current local preview. A checked code item does not 
 - [x] RoEx Tonn live-tested on 2026-10-24 with the production key: vocal + beat recombine preview, refinement, and one paid full-track WAV. Multitrack mix and mastering previews were live-tested the same day; all RoEx outputs are limited to ≤ −1 dBTP. Provider mode uploads user audio to RoEx; complete vendor review before production.
 - [x] Invalid audio content with a `.wav` filename was rejected by the upload API with HTTP 415.
 - [x] Mixer and library layouts have no horizontal overflow at a 390 px viewport; keyboard tab focus is visible.
-- [x] Full dependency audit is clear. Re-reviewed 2026-10-27: npm audit (all and production) and pip-audit report no vulnerabilities after patch updates and a pip upgrade. Reviewed 2026-10-10: `npm audit --omit=dev` reports zero production vulnerabilities. The full audit reports five findings in the development-only ESLint dependency chain, all through `braces`; its [upstream advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) currently lists no patched version. Do not force the suggested major Next.js lint-config downgrade; recheck for a compatible upstream fix before release.
+- [x] Full dependency audit is clear. Re-reviewed 2026-10-27: npm audit (all and production) and pip-audit report no vulnerabilities after patch updates and a pip upgrade. (The earlier development-only `braces` advisory chain no longer appears.)
 
 ## Required before any production deployment
 
