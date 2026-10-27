@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useClerk } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
+import { Wordmark } from "@/components/site-chrome";
 import { ReactNode, useEffect, useRef, useState } from "react";
 
 const tabs = [
@@ -47,7 +48,7 @@ export default function StudioShell({ children, name, email }: { children: React
   return <div className="studio">
     <header className="studio-bar">
       <div className="container studio-bar-inner">
-        <Link className="wordmark" href="/studio/mixer" aria-label="FastMix studio">Fast<b>mix</b></Link>
+        <Wordmark href="/studio/mixer" label="FastMix studio" />
         <nav className="studio-tabs" aria-label="Studio">
           {tabs.map((tab) => <Link key={tab.href} href={tab.href} aria-current={pathname.startsWith(tab.href) ? "page" : undefined}>{tab.label}</Link>)}
         </nav>

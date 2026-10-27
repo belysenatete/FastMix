@@ -10,8 +10,11 @@ const labels = {
   fr: { how: "Comment ça marche", listen: "Écouter", pricing: "Tarifs", faq: "FAQ", login: "Connexion", start: "Commencer", menu: "Menu", close: "Fermer", tagline: "Mixez et masterisez vos voix en quelques minutes.", product: "Produit", account: "Compte", legal: "Mentions", guide: "Guide du son", signup: "Créer un compte", privacy: "Confidentialité", terms: "Conditions", cookies: "Cookies" },
 };
 
-export function Wordmark() {
-  return <Link href="/" className="wordmark" aria-label="FastMix home">Fast<b>mix</b></Link>;
+/** The FastMix logo (raw-to-mixed waveform beside the wordmark), linking home or to the studio. */
+export function Wordmark({ href = "/", label = "FastMix home" }: { href?: string; label?: string }) {
+  // A plain <img>: the logo is a small static SVG, so next/image's optimization adds nothing.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <Link href={href} className="wordmark" aria-label={label}><img src="/brand/fastmix-logo.svg" alt="" width={433} height={128} /></Link>;
 }
 
 function LocaleSwitch({ locale, onLocale }: { locale: Locale; onLocale: (locale: Locale) => void }) {

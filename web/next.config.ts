@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
+  // Hide the development-only "N" tools button; compile and runtime errors still show.
+  devIndicators: false,
   partialPrefetching: true,
   experimental: {
     // The Clerk proxy buffers request bodies and silently truncates them past this size (default 10 MB),
