@@ -27,7 +27,7 @@ This checklist reflects the current local preview. A checked code item does not 
 - [ ] Set unique production secrets in a secret manager. Do not reuse values from `.env.example` or local Compose defaults.
 - [ ] Use HTTPS, private network policies, and managed PostgreSQL, Redis, and object storage with least-privilege service identities.
 - [ ] Configure storage lifecycle/retention, verify audio deletion, and document data processing and backup retention.
-- [ ] Define and test database backups, restore, migration rollback, and disaster recovery.
+- [ ] Define and test database backups, restore, migration rollback, and disaster recovery. Backup, restore check and restore drill scripts written and verified locally on 2026-10-27; still needed: a daily schedule, off-machine copies, and migration rollback steps.
 - [ ] Configure structured operational logs, error reporting, queue/worker metrics, alerts, and retention without logging private audio or credentials.
 - [ ] Add verified payment webhooks only after pricing, tax, refund, cancellation, and entitlement behavior are approved.
 - [ ] Finalize privacy, terms, and cookie notices with the actual company, vendors, retention, and user rights. Drafts written 2026-10-26 (operator Nexora LLC); still need real support/privacy inboxes, the operator's state of organization, RoEx data-handling confirmation, and legal review.

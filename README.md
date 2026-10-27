@@ -33,3 +33,11 @@ The landing page's before/after demo (`web/public/demo/`) is rendered from origi
 Worker unit tests run inside the API image: `docker compose run --rm -v ./worker/tests:/srv/fastmix/tests:ro --no-deps api python -m unittest discover -s tests`.
 
 Audio uploads require the Compose API and private object storage. See `phases.md`, `projectDescription.md`, `projectTracker.md`, and `codingPrinciples.md` for product scope and implementation status.
+
+## Backups
+
+Run these from the repository root with the Compose stack running (Git Bash on Windows).
+
+- `scripts/backup.sh` saves the database (`db.dump`) and every stored audio file (`audio/`) to `backups/<UTC timestamp>/` and keeps the newest 14 (`KEEP=30 scripts/backup.sh` to change). Schedule it daily, for example with Windows Task Scheduler or cron, and copy `backups/` to another machine or cloud storage: a backup on the same disk doesn't survive that disk failing.
+- `scripts/restore-check.sh [backups/<stamp>]` proves a backup is usable without touching live data. It restores the dump into a scratch database, compares row counts with the live database, and checks that every audio file the database points to is in the backup.
+- `scripts/restore.sh backups/<stamp> --yes` is the disaster-recovery restore. It stops the API and processor, **replaces** the live database and audio bucket with the backup, and starts them again. For a drill, point it at scratch copies: `TARGET_DB=fastmix_drill TARGET_BUCKET=fastmix-drill scripts/restore.sh backups/<stamp> --yes`.

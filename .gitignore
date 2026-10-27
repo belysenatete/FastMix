@@ -11,3 +11,6 @@ __pycache__/
 
 # Personal song files used for local testing.
 /my-song/
+
+# Local backups made by scripts/backup.sh.
+/backups/
