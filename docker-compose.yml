@@ -65,7 +65,7 @@ services:
     volumes:
       - ./database/migrations:/migrations:ro
     entrypoint: >-
-      /bin/sh -c 'psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/002_job_indexes.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/003_clerk_identity.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/004_full_renders.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/005_version_settings.sql'
+      /bin/sh -c 'psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/002_job_indexes.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/003_clerk_identity.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/004_full_renders.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/005_version_settings.sql && psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 -f /migrations/006_usage.sql'
 
   api:
     build: ./worker
@@ -81,6 +81,10 @@ services:
       S3_BUCKET: ${S3_BUCKET:-fastmix-audio}
       S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
       ROEX_ENABLED: ${ROEX_API_KEY:+true}
+      # Local development gives every account the Artist plan so full tracks can be tested without billing.
+      # Production must leave this unset (Starter) and grant plans through subscriptions.
+      FASTMIX_DEFAULT_PLAN: ${FASTMIX_DEFAULT_PLAN:-artist}
+      FASTMIX_PREVIEWS_PER_DAY: ${FASTMIX_PREVIEWS_PER_DAY:-40}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:

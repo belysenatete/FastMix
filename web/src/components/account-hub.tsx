@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatPrice, plans } from "@/lib/plans";
+import { fetchUsage, resetDate, Usage } from "@/lib/usage";
 
 const mixPrompts = [
   ["Afrobeats", "Afrobeats party, vocals upfront, light autotune, some reverb, loud and punchy"],
@@ -29,6 +30,13 @@ const answers = [
   ["How do I change a mix?", "Under step 3 in the mixer, write what should change, for example “vocal louder”. Earlier versions stay in your library."],
 ];
 
+function UsageMeter({ label, used, limit }: { label: string; used: number; limit: number }) {
+  return <div className="usage-meter">
+    <p><span>{label}</span><b className="mono">{used} / {limit}</b></p>
+    <div className="progress" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={used}><i style={{ width: `${limit ? Math.min(100, (used / limit) * 100) : 0}%` }} /></div>
+  </div>;
+}
+
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) { return <section className={`card ${className}`}>{children}</section>; }
 function PageHead({ title, description }: { title: string; description: string }) { return <div className="page-head"><div><h1>{title}</h1><p>{description}</p></div></div>; }
 
@@ -39,6 +47,14 @@ export default function AccountHub({ email }: { email: string }) {
   const [language, setLanguage] = useState("English");
   const [updates, setUpdates] = useState(false);
   const [tab, setTab] = useState("Mix prompts");
+  const [usage, setUsage] = useState<Usage | null>(null);
+
+  useEffect(() => {
+    if (!path.endsWith("/billing")) return;
+    let mounted = true;
+    void fetchUsage().then((result) => { if (mounted) setUsage(result); });
+    return () => { mounted = false; };
+  }, [path]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -68,10 +84,16 @@ export default function AccountHub({ email }: { email: string }) {
   </>;
 
   if (path.endsWith("/billing")) return <>
-    <PageHead title="Plan & billing" description="Purchases are not enabled during the preview." />
+    <PageHead title="Plan & billing" description="Your plan and what you have used. Checkout opens at launch." />
     {feedback}
     <div className="card-grid">
-      <Card><h2>Current plan</h2><p className="plan-price">Starter · Free</p><p>Unlimited 30-second previews. No payment method is attached.</p></Card>
+      <Card><h2>Current plan</h2>{usage ? <>
+        <p className="plan-price">{usage.planName}</p>
+        <UsageMeter label="Full-length tracks this month" used={usage.fullTracks.used} limit={usage.fullTracks.limit} />
+        <p className="hint">{usage.fullTracks.limit ? `Resets on ${resetDate(usage)}.` : "Previews are free. Full-length tracks come with Pro and Artist."}</p>
+        <UsageMeter label="Previews in the last 24 hours" used={usage.previews.used} limit={usage.previews.limit} />
+        <p className="hint">Previews are free, with a fair-use limit.</p>
+      </> : <p>Your plan and usage appear here once the audio service is running.</p>}</Card>
       <Card><h2>Pro and Artist</h2><p className="plan-price">From {formatPrice(plans[0].price.monthly)}/mo</p><p>{plans.map((plan) => `${plan.name}: ${plan.tracks} full-length tracks a month for ${formatPrice(plan.price.monthly)}/mo or ${formatPrice(plan.price.yearly)}/yr.`).join(" ")} Checkout opens at launch.</p><Link className="text-link" href="/pricing">Compare plans →</Link></Card>
       <Card><h2>Invoices</h2><p>No invoices yet.</p></Card>
     </div>

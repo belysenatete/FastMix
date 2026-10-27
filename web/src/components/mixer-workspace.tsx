@@ -5,6 +5,7 @@ import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from "re
 import SettingsKnobs, { VersionSettings } from "@/components/settings-knobs";
 import WaitingLine from "@/components/waiting-line";
 import Transport from "@/components/transport";
+import { fetchUsage, resetDate, Usage } from "@/lib/usage";
 import { createProject, getActiveProjectId, listProjects, persistProject, ProjectRecord, removeProject, setActiveProjectId, TrackCategory, TrackRecord } from "@/lib/projects";
 
 const categories: Array<{ id: TrackCategory; name: string; detail: string }> = [
@@ -78,9 +79,17 @@ export default function MixerWorkspace() {
   const [jobPending, setJobPending] = useState(false);
   const [outputUrl, setOutputUrl] = useState<string | null>(null);
   const [outputPending, setOutputPending] = useState(false);
+  const [usage, setUsage] = useState<Usage | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const wordCount = useMemo(() => project?.prompt.length || 0, [project?.prompt]);
+
+  // Refresh the plan allowance whenever a version starts or finishes.
+  useEffect(() => {
+    let mounted = true;
+    void fetchUsage().then((result) => { if (mounted) setUsage(result); });
+    return () => { mounted = false; };
+  }, [job?.id, job?.status]);
 
   useEffect(() => {
     let mounted = true;
@@ -194,7 +203,8 @@ export default function MixerWorkspace() {
 
   async function requestFullTrack() {
     if (!project || !job || job.render !== "preview" || job.status !== "completed") return;
-    if (!window.confirm("Render the full-length track? This uses RoEx credits (about $2–2.50) once for this version.")) return;
+    const remaining = usage ? usage.fullTracks.limit - usage.fullTracks.used : null;
+    if (!window.confirm(remaining === null ? "Render the full-length track? This uses one of your full-length tracks this month." : `Render the full-length track? This uses 1 of your ${remaining} remaining full-length tracks this month.`)) return;
     setJobPending(true);
     try {
       const response = await fetch(`/api/projects/${encodeURIComponent(project.id)}/jobs/${encodeURIComponent(job.id)}/full`, { method: "POST" });
@@ -300,6 +310,11 @@ export default function MixerWorkspace() {
   const hasDirection = project.prompt.trim().length > 0;
   const ready = hasTracks && hasDirection;
   const busy = jobPending || job?.status === "queued" || job?.status === "processing";
+  const fullTracksLeft = usage ? Math.max(0, usage.fullTracks.limit - usage.fullTracks.used) : null;
+  const allowanceText: ReactNode = !usage ? "Uses one of your full-length tracks this month."
+    : usage.fullTracks.limit === 0 ? <>Full-length tracks come with Pro and Artist. <Link className="text-link" href="/pricing">See plans</Link></>
+    : fullTracksLeft === 0 ? `You've used all ${usage.fullTracks.limit} full-length tracks on ${usage.planName} this month. They reset on ${resetDate(usage)}.`
+    : `Uses 1 of your ${fullTracksLeft} remaining full-length tracks this month (${usage.planName}, resets ${resetDate(usage)}).`;
   const completed = job?.status === "completed";
   const ai = job?.processor === "roex_tonn";
   const categoryOptions = master ? categories.filter((item) => item.id === "master") : categories.filter((item) => item.id !== "master");
@@ -372,9 +387,9 @@ export default function MixerWorkspace() {
 
     <Step number={4} title="Download" state={completed && job?.render === "full" ? "done" : completed ? "current" : "todo"}>
       {completed && job ? <div className="button-row">
-        {ai && job.render === "preview" && <button className="btn btn-primary" disabled={jobPending} onClick={() => void requestFullTrack()}>Get the full track</button>}
+        {ai && job.render === "preview" && <button className="btn btn-primary" disabled={jobPending || fullTracksLeft === 0} onClick={() => void requestFullTrack()}>Get the full track</button>}
         <button className="btn btn-secondary" onClick={downloadOutput}>Download {job.render === "full" ? "full track" : "this preview"} ({job.output_format?.toUpperCase() || "WAV"})</button>
-        {ai && job.render === "preview" && <p className="hint">The full track uses RoEx credits (about $2–2.50), charged once per version.</p>}
+        {ai && job.render === "preview" && <p className="hint">{allowanceText}</p>}
       </div> : <p className="hint">Available once a version is ready.</p>}
     </Step>
 

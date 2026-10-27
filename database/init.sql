@@ -78,6 +78,17 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Plan usage ledger (see migrations/006_usage.sql): no foreign key on job_id, so deleting a session keeps its usage.
+CREATE TABLE IF NOT EXISTS usage_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  job_id UUID NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('preview', 'full_track')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (job_id, kind)
+);
+CREATE INDEX IF NOT EXISTS usage_events_user_kind_time ON usage_events(user_id, kind, created_at);
+
 CREATE TABLE IF NOT EXISTS invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

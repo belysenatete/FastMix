@@ -9,6 +9,7 @@ from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field
 
 from .direction import describe, refine, settings_from_prompt
+from .plans import claim_full_track, claim_preview, release
 from .uploads import database_url, find_owner, require_internal_app, storage_client
 
 router = APIRouter(prefix="/api/projects", tags=["jobs"])
@@ -42,6 +43,7 @@ def enqueue(job_id: uuid.UUID, project_id: uuid.UUID):
     except Exception as error:
         with psycopg.connect(database_url()) as connection:
             connection.execute("UPDATE processing_jobs SET status = 'failed', error_code = 'queue_unavailable', updated_at = now() WHERE id = %s", (job_id,))
+            release(connection, job_id)
             connection.execute("UPDATE projects SET status = 'failed', updated_at = now() WHERE id = %s", (project_id,))
         raise HTTPException(status_code=503, detail="The preview processor is unavailable. Please retry shortly.") from error
 
@@ -90,9 +92,10 @@ def insert_preview(connection, project_id: uuid.UUID, processor: str, settings: 
 def create_job(project_id: uuid.UUID, user_id: str = Depends(require_internal_app)):
     processor = current_processor()
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
-        find_owner(connection, user_id, project_id)
+        owner = find_owner(connection, user_id, project_id)
         project = lock_ready_project(connection, project_id, processor)
         job_id = insert_preview(connection, project_id, processor, settings_from_prompt(project["prompt"]))
+        claim_preview(connection, owner, job_id)
         job = fetch_job(connection, project_id, job_id)
     enqueue(job_id, project_id)
     return {"job": job}
@@ -106,7 +109,7 @@ def refine_job(project_id: uuid.UUID, job_id: uuid.UUID, request: RefineRequest,
         raise HTTPException(status_code=422, detail="Describe what should change in the next version")
     processor = current_processor()
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
-        find_owner(connection, user_id, project_id)
+        owner = find_owner(connection, user_id, project_id)
         project = lock_ready_project(connection, project_id, processor)
         source = connection.execute(
             "SELECT j.status, j.settings, s.settings AS source_settings FROM processing_jobs j LEFT JOIN processing_jobs s ON s.id = j.source_job_id WHERE j.id = %s AND j.project_id = %s",
@@ -122,6 +125,7 @@ def refine_job(project_id: uuid.UUID, job_id: uuid.UUID, request: RefineRequest,
         if not changes:
             raise HTTPException(status_code=422, detail=REFINE_HELP)
         new_job_id = insert_preview(connection, project_id, processor, settings, note)
+        claim_preview(connection, owner, new_job_id)
         job = fetch_job(connection, project_id, new_job_id)
     enqueue(new_job_id, project_id)
     return {"job": job, "changes": changes}
@@ -132,7 +136,7 @@ def create_full_render(project_id: uuid.UUID, job_id: uuid.UUID, user_id: str = 
     """Render a completed AI preview at full length. Spends provider credits once per preview."""
     full_job_id = uuid.uuid4()
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
-        find_owner(connection, user_id, project_id)
+        owner = find_owner(connection, user_id, project_id)
         connection.execute("SELECT id FROM projects WHERE id = %s FOR UPDATE", (project_id,))
         source = connection.execute(
             "SELECT id, status, processor, render, provider_data, settings FROM processing_jobs WHERE id = %s AND project_id = %s",
@@ -151,6 +155,7 @@ def create_full_render(project_id: uuid.UUID, job_id: uuid.UUID, user_id: str = 
             "INSERT INTO processing_jobs (id, project_id, status, progress, processor, render, source_job_id, settings) VALUES (%s, %s, 'queued', 0, 'roex_tonn', 'full', %s, %s)",
             (full_job_id, project_id, job_id, Jsonb(source["settings"]) if source["settings"] else None),
         )
+        claim_full_track(connection, owner, full_job_id)
         connection.execute("UPDATE projects SET status = 'queued', updated_at = now() WHERE id = %s", (project_id,))
         job = fetch_job(connection, project_id, full_job_id)
     enqueue(full_job_id, project_id)
@@ -178,16 +183,18 @@ def get_job(project_id: uuid.UUID, job_id: uuid.UUID, user_id: str = Depends(req
 @router.post("/{project_id}/jobs/{job_id}/retry", status_code=202)
 def retry_job(project_id: uuid.UUID, job_id: uuid.UUID, user_id: str = Depends(require_internal_app)):
     with psycopg.connect(database_url(), row_factory=dict_row) as connection:
-        find_owner(connection, user_id, project_id)
+        owner = find_owner(connection, user_id, project_id)
         connection.execute("SELECT id FROM projects WHERE id = %s FOR UPDATE", (project_id,))
         if connection.execute("SELECT 1 FROM processing_jobs WHERE project_id = %s AND status IN ('queued', 'processing') LIMIT 1", (project_id,)).fetchone():
             raise HTTPException(status_code=409, detail="A session job is already in progress")
         retried = connection.execute(
-            "UPDATE processing_jobs SET status = 'queued', progress = 0, error_code = NULL, attempt = attempt + 1, updated_at = now() WHERE project_id = %s AND id = %s AND status = 'failed' RETURNING id",
+            "UPDATE processing_jobs SET status = 'queued', progress = 0, error_code = NULL, attempt = attempt + 1, updated_at = now() WHERE project_id = %s AND id = %s AND status = 'failed' RETURNING id, render",
             (project_id, job_id),
         ).fetchone()
         if not retried:
             raise HTTPException(status_code=409, detail="Only a failed job can be retried")
+        # A failed job gave back what it used, so retrying claims it again.
+        (claim_full_track if retried["render"] == "full" else claim_preview)(connection, owner, job_id)
         connection.execute("UPDATE projects SET status = 'queued', updated_at = now() WHERE id = %s", (project_id,))
         job = fetch_job(connection, project_id, job_id)
     enqueue(job_id, project_id)

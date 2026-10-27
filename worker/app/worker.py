@@ -14,6 +14,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from .jobs import QUEUE_NAME
+from .plans import release
 from .uploads import database_url
 from .roex import RoExError, create_full as create_roex_full, create_preview as create_roex_preview
 from .audio import LOUDNESS_TARGET_LUFS, finish_loudness, local_mix_graph
@@ -63,6 +64,7 @@ def mark_failed(job_id: uuid.UUID, project_id: uuid.UUID, error_code: str = "pro
             "UPDATE processing_jobs SET status = 'failed', error_code = %s, updated_at = now() WHERE id = %s AND status = 'processing'",
             (error_code, job_id),
         )
+        release(connection, job_id)
         connection.execute(
             "UPDATE projects SET status = CASE WHEN EXISTS (SELECT 1 FROM processing_jobs WHERE project_id = %s AND status IN ('queued','processing')) THEN 'queued' ELSE 'failed' END, updated_at = now() WHERE id = %s",
             (project_id, project_id),

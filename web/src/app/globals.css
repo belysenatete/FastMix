@@ -219,6 +219,9 @@ button { cursor: pointer; }
 .studio-content { padding-block: 32px 72px; }
 .studio-loading { padding: 60px 20px; text-align: center; color: var(--muted); }
 .notice-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; margin: 0 0 18px; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--meter-ok); border-radius: var(--radius); font-size: 14px; }
+/* Plan usage on the billing page */
+.usage-meter { margin: 14px 0 4px; }
+.usage-meter p { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 6px; font-size: 14px; }
 .notice-bar button { border: 0; background: none; font-size: 20px; line-height: 1; color: var(--muted); }
 .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
 .page-head h1 { margin-bottom: 4px; }
