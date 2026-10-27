@@ -41,7 +41,7 @@ export default function PrivacyPage() {
 
       <h2>3. Who we share it with</h2>
       <p>We share data only with providers that help us run {product}, under contracts that limit their use to providing their service to us:</p>
-      <div className="table-scroll"><table className="legal-table">
+      <div className="table-scroll" tabIndex={0} role="region" aria-label="Providers we share data with"><table className="legal-table">
         <thead><tr><th>Provider</th><th>Purpose</th><th>Data</th></tr></thead>
         <tbody>{providers.map(([name, purpose, data]) => <tr key={name}><td>{name}</td><td>{purpose}</td><td>{data}</td></tr>)}</tbody>
       </table></div>

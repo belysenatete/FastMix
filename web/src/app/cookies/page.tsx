@@ -16,7 +16,7 @@ export default function CookiesPage() {
   return <SimplePage label="Legal" title="Cookie policy" intro={`Last updated ${legalUpdated}. ${product} only uses cookies and browser storage that the service needs to work. We don't use analytics or advertising cookies.`}>
     <div className="prose legal">
       <h2>What we use</h2>
-      <div className="table-scroll"><table className="legal-table">
+      <div className="table-scroll" tabIndex={0} role="region" aria-label="Cookies and browser storage we use"><table className="legal-table">
         <thead><tr><th>Name</th><th>Purpose</th><th>Type</th><th>Kept for</th></tr></thead>
         <tbody>{cookies.map(([name, purpose, type, duration]) => <tr key={name}><td>{name}</td><td>{purpose}</td><td>{type}</td><td>{duration}</td></tr>)}</tbody>
       </table></div>

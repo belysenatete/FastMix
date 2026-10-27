@@ -61,6 +61,8 @@ button { cursor: pointer; }
 .legal li::marker { color: var(--brass); }
 .legal li { margin: 4px 0; }
 .legal a { color: var(--brass); }
+/* Links inside running text are underlined so they don't rely on color alone (WCAG 1.4.1). */
+.legal p a, .legal li a, .lede a, .hint a, .fine-print a, .card p a { text-decoration: underline; text-underline-offset: 3px; }
 .legal b { color: var(--text); font-weight: 600; }
 .legal-toc { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); font-size: 14px; }
 .table-scroll { overflow-x: auto; margin: 12px 0; }

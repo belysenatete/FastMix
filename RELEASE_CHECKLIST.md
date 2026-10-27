@@ -31,7 +31,7 @@ This checklist reflects the current local preview. A checked code item does not 
 - [ ] Configure structured operational logs, error reporting, queue/worker metrics, alerts, and retention without logging private audio or credentials. Built-in alerts, watchdog and `/ops/status` added 2026-10-27; still needed: a real webhook URL, log retention on the host, and optionally a hosted error tracker.
 - [ ] Add verified payment webhooks only after pricing, tax, refund, cancellation, and entitlement behavior are approved.
 - [ ] Finalize privacy, terms, and cookie notices with the actual company, vendors, retention, and user rights. Drafts written 2026-10-26 (operator Nexora LLC); still need real support/privacy inboxes, the operator's state of organization, RoEx data-handling confirmation, and legal review.
-- [ ] Review WCAG 2.2 AA with keyboard and assistive technology at mobile and desktop sizes.
+- [ ] Review WCAG 2.2 AA with keyboard and assistive technology at mobile and desktop sizes. Automated axe and keyboard checks pass at 1280 and 390 px (2026-10-27); a manual screen-reader pass is still needed.
 - [ ] Run the stack in a staging environment and verify sign-in, upload limits, ownership boundaries, queue failures/retries, playback, deletion, restore, and rollback.
 - [ ] Review current dependency advisories and licenses before each release.
 

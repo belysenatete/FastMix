@@ -52,7 +52,7 @@ export default function StudioShell({ children, name, email }: { children: React
           {tabs.map((tab) => <Link key={tab.href} href={tab.href} aria-current={pathname.startsWith(tab.href) ? "page" : undefined}>{tab.label}</Link>)}
         </nav>
         <div className="account" ref={menuRef}>
-          <button className="account-button" aria-expanded={menuOpen} aria-haspopup="menu" onClick={() => setMenuOpen(!menuOpen)}>
+          <button className="account-button" aria-label={`Account menu for ${displayName}`} aria-expanded={menuOpen} aria-haspopup="menu" onClick={() => setMenuOpen(!menuOpen)}>
             <span className="avatar" aria-hidden="true">{initials}</span><span className="account-name">{displayName}</span><span aria-hidden="true">▾</span>
           </button>
           {menuOpen && <div className="account-menu" role="menu">
