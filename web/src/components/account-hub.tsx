@@ -1,7 +1,8 @@
 "use client";
 
+import { useClerk } from "@clerk/nextjs";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatPrice, plans } from "@/lib/plans";
 import { fetchUsage, resetDate, Usage } from "@/lib/usage";
@@ -48,6 +49,25 @@ export default function AccountHub({ email }: { email: string }) {
   const [updates, setUpdates] = useState(false);
   const [tab, setTab] = useState("Mix prompts");
   const [usage, setUsage] = useState<Usage | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const clerk = useClerk();
+  const router = useRouter();
+
+  async function deleteAccount() {
+    setDeleting(true);
+    try {
+      const response = await fetch("/api/account", { method: "DELETE" });
+      const body = await response.json().catch(() => ({})) as { detail?: string; error?: string };
+      if (!response.ok) throw new Error(body.detail || body.error || "Your account could not be deleted. Please retry.");
+      // Drop the cached session list and profile kept in this browser.
+      try { Object.keys(localStorage).filter((key) => key.startsWith("fastmix.")).forEach((key) => localStorage.removeItem(key)); } catch { /* storage unavailable */ }
+      await clerk.signOut({ redirectUrl: "/" }).catch(() => router.replace("/"));
+    } catch (issue) {
+      setNotice(issue instanceof Error ? issue.message : "Your account could not be deleted. Please retry.");
+      setDeleting(false);
+    }
+  }
 
   useEffect(() => {
     if (!path.endsWith("/billing")) return;
@@ -79,7 +99,11 @@ export default function AccountHub({ email }: { email: string }) {
       <Card><h2>Profile</h2><label className="field">Display name<input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} /></label><label className="field">Email address<input value={email} readOnly /></label><button className="btn btn-primary" onClick={() => { const savedName = name.trim() || email.split("@")[0]; setName(savedName); localStorage.setItem("fastmix.profile.name", savedName); window.dispatchEvent(new Event("fastmix-profile")); setNotice("Profile saved in this browser."); }}>Save profile</button></Card>
       <Card><h2>Preferences</h2><p className="hint">Saved in this browser only.</p><label className="field">Language<select value={language} onChange={(e) => { setLanguage(e.target.value); localStorage.setItem("fastmix.profile.language", e.target.value); }}><option>English</option><option>Français</option></select></label><label className="check"><input type="checkbox" checked={updates} onChange={(e) => { setUpdates(e.target.checked); localStorage.setItem("fastmix.profile.updates", String(e.target.checked)); }} /> Email me about product updates</label></Card>
       <Card><h2>Sign-in and security</h2><p>Clerk manages your sign-in, password and email verification. Use “Forgot password” on the sign-in page to recover access.</p></Card>
-      <Card><h2>Delete your data</h2><p>Delete sessions and their audio from the library. Whole-account deletion will be added before launch.</p><a className="text-link" href="/studio/library">Go to the library →</a></Card>
+      <Card><h2>Delete your account</h2>
+        <p>Deletes your sessions, uploaded tracks, mixes and sign-in for good. This can&apos;t be undone. To remove only some sessions, use the <Link className="text-link" href="/studio/library">library</Link>.</p>
+        <label className="field">Type DELETE to confirm<input value={deleteConfirm} onChange={(event) => setDeleteConfirm(event.target.value)} autoComplete="off" /></label>
+        <button className="btn btn-danger-outline" disabled={deleteConfirm !== "DELETE" || deleting} onClick={() => void deleteAccount()}>{deleting ? "Deleting…" : "Delete my account"}</button>
+      </Card>
     </div>
   </>;
 

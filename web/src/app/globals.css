@@ -86,6 +86,8 @@ button { cursor: pointer; }
 .btn-text { background: none; border: 0; padding: 4px 2px; color: var(--muted); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
 .btn-text:hover { color: var(--text); }
 .btn-danger { color: var(--error); }
+.btn-danger-outline { background: transparent; border: 1px solid var(--error); color: var(--error); }
+.btn-danger-outline:hover:not(:disabled) { background: rgba(232, 131, 106, .12); }
 .button-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 
 /* Segmented switches (mix/master, before/after, language) */

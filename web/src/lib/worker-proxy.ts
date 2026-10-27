@@ -26,7 +26,7 @@ export async function proxyWorker(request: Request, workerPath: string, method: 
     method,
     headers,
     cache: "no-store",
-    signal: AbortSignal.timeout(method === "POST" ? 180_000 : 15_000),
+    signal: AbortSignal.timeout(method === "GET" ? 15_000 : 180_000),
   };
   if (method === "POST" && request.body) {
     options.body = request.body;
