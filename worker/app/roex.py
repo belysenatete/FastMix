@@ -7,6 +7,7 @@ as soon as RoEx returns it, so a retried download never pays twice.
 """
 
 import json
+import logging
 import os
 import subprocess
 import time
@@ -25,6 +26,7 @@ BASE_URL = "https://tonn.roexaudio.com"
 POLL_SECONDS = 5
 POLL_TIMEOUT_SECONDS = 900
 MAX_OUTPUT_BYTES = 500 * 1024 * 1024
+logger = logging.getLogger("fastmix.roex")
 
 
 class RoExError(RuntimeError):
@@ -35,7 +37,33 @@ class RoExError(RuntimeError):
         self.code = code
 
 
+RETRY_DELAYS_SECONDS = (2, 6)
+TRANSIENT_HTTP = {429, 500, 502, 503, 504}
+# Final retrievals spend credits; they are never repeated here. A job-level retry reuses the saved URL instead.
+CHARGED_PATHS = {"/retrievefinalmix", "/retrievefinalmaster", "/retrieverecombine"}
+
+
+class _Transient(Exception):
+    def __init__(self, error: RoExError):
+        super().__init__(str(error))
+        self.error = error
+
+
 def _api_request(path: str, payload: dict | None = None, method: str = "POST") -> tuple[int, dict]:
+    """Call Tonn, retrying brief network or server hiccups on requests that cost nothing."""
+    attempts = 1 if path in CHARGED_PATHS else len(RETRY_DELAYS_SECONDS) + 1
+    for attempt in range(attempts):
+        try:
+            return _api_request_once(path, payload, method)
+        except _Transient as transient:
+            if attempt == attempts - 1:
+                raise transient.error from transient
+            logger.info("Retrying RoEx %s after a temporary failure (%s)", path, transient.error)
+            time.sleep(RETRY_DELAYS_SECONDS[attempt])
+    raise AssertionError("unreachable")
+
+
+def _api_request_once(path: str, payload: dict | None, method: str) -> tuple[int, dict]:
     api_key = os.getenv("ROEX_API_KEY", "").strip()
     if not api_key:
         raise RoExError("RoEx Tonn is selected, but ROEX_API_KEY is not configured", "provider_not_configured")
@@ -53,12 +81,17 @@ def _api_request(path: str, payload: dict | None = None, method: str = "POST") -
     except HTTPError as error:
         # Provider response bodies can contain diagnostics; keep them out of logs.
         if error.code == 402:
-            raise RoExError("Your RoEx credit balance is too low for a full-length track. Add credits, then retry.", "provider_credits") from error
+            # RoEx has no balance API, so this is the first sign the account is empty. Previews stop too.
+            logger.error("ALERT roex_credits: RoEx returned 402 for %s. Top up the RoEx account or enable Auto Top-Up.", path)
+            raise RoExError("The RoEx credit balance is too low. Add credits, then retry.", "provider_credits") from error
         if error.code == 401:
+            logger.error("ALERT roex_auth: RoEx rejected the API key for %s.", path)
             raise RoExError("RoEx rejected the API key. Check ROEX_API_KEY.", "provider_auth") from error
+        if error.code in TRANSIENT_HTTP:
+            raise _Transient(RoExError(f"RoEx Tonn request failed with HTTP {error.code}")) from error
         raise RoExError(f"RoEx Tonn request failed with HTTP {error.code}") from error
     except (TimeoutError, URLError, OSError) as error:
-        raise RoExError("RoEx Tonn could not be reached") from error
+        raise _Transient(RoExError("RoEx Tonn could not be reached")) from error
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise RoExError("RoEx Tonn returned an invalid response") from error
 

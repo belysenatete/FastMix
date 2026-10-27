@@ -29,11 +29,14 @@ function jobFromApi(row: Record<string, unknown>): JobItem { return { id: String
 
 function formatBytes(bytes: number) { return bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`; }
 
+const UNAVAILABLE = "AI mixing is paused on our side for a moment. This didn't use any of your tracks; please retry a little later.";
+// Setup problems are explained to the operator in development and kept generic for artists in production.
+const setupMessage = (detail: string) => process.env.NODE_ENV === "development" ? detail : UNAVAILABLE;
 const failureMessages: Record<string, string> = {
-  provider_credits: "Your RoEx credit balance is too low. Add credits in the Tonn portal, then retry.",
-  provider_auth: "RoEx rejected the API key. Check ROEX_API_KEY, rebuild the API and processor, then retry.",
-  provider_not_configured: "RoEx AI isn't configured. Add ROEX_API_KEY to the root .env and rebuild the API and processor.",
-  provider_dev_key: "The RoEx key in .env is a development key, which only returns placeholder results. Put your production key in ROEX_API_KEY, rebuild the API and processor, then retry.",
+  provider_credits: setupMessage("The RoEx credit balance is empty, so previews and full tracks stop. Top up in the Tonn portal (or turn on Auto Top-Up), then retry."),
+  provider_auth: setupMessage("RoEx rejected the API key. Check ROEX_API_KEY, rebuild the API and processor, then retry."),
+  provider_not_configured: setupMessage("RoEx AI isn't configured. Add ROEX_API_KEY to the root .env and rebuild the API and processor."),
+  provider_dev_key: setupMessage("The RoEx key in .env is a development key, which only returns placeholder results. Put your production key in ROEX_API_KEY, rebuild the API and processor, then retry."),
   provider_expired: "The RoEx download link expired. Retry to request it again.",
   invalid_audio: "RoEx couldn't process this audio. Use clean tracks under 8 minutes each, then retry.",
   queue_unavailable: "The processing queue was unavailable. Retry in a moment.",

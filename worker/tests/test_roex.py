@@ -53,6 +53,28 @@ class ApiErrorTests(unittest.TestCase):
             self.assertEqual(raised.exception.code, code)
             self.assertNotIn("provider detail", str(raised.exception))
 
+    def test_free_requests_retry_brief_outages(self):
+        ok = mock.MagicMock()
+        ok.__enter__.return_value.status = 200
+        ok.__enter__.return_value.read.return_value = b'{"ok": true}'
+        with mock.patch.dict(os.environ, {"ROEX_API_KEY": "test-key"}), mock.patch.object(roex.time, "sleep") as sleep, \
+                mock.patch.object(roex, "urlopen", side_effect=[OSError("reset"), ok]) as call:
+            self.assertEqual(roex._api_request("/mixpreview", {}), (200, {"ok": True}))
+        self.assertEqual((call.call_count, sleep.call_count), (2, 1))
+
+    def test_retries_give_up_with_the_original_error(self):
+        with mock.patch.dict(os.environ, {"ROEX_API_KEY": "test-key"}), mock.patch.object(roex.time, "sleep"), \
+                mock.patch.object(roex, "urlopen", side_effect=OSError("down")) as call, self.assertRaises(roex.RoExError) as raised:
+            roex._api_request("/mixpreview", {})
+        self.assertEqual((call.call_count, str(raised.exception)), (3, "RoEx Tonn could not be reached"))
+
+    def test_charged_requests_are_never_repeated(self):
+        error = HTTPError("https://tonn.roexaudio.com/x", 503, "error", {}, io.BytesIO(b""))
+        with mock.patch.dict(os.environ, {"ROEX_API_KEY": "test-key"}), mock.patch.object(roex.time, "sleep"), \
+                mock.patch.object(roex, "urlopen", side_effect=error) as call, self.assertRaises(roex.RoExError):
+            roex._api_request("/retrieverecombine", {})
+        self.assertEqual(call.call_count, 1)
+
 
 @mock.patch.object(roex, "POLL_SECONDS", 0)
 class PreviewTests(unittest.TestCase):
