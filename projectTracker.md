@@ -1,6 +1,6 @@
 # Project tracker
 
-Last updated: 2026-10-27
+Last updated: 2026-11-02
 
 ## Current status
 
@@ -8,8 +8,8 @@ Last updated: 2026-10-27
 - **Current phase:** Phases 0–9 complete; awaiting staging and real usage evidence.
 - **Progress:** Phase 9 complete as a provisional next-release backlog. It records repository evidence, known release blockers, recommended telemetry, and a reprioritization rule. No real user data was available.
 - **Current focus:** Easymix parity for AI mixing, one step at a time (user-approved plan 2026-10-23): 1 Next.js security upgrade ✓, 2 RoEx baseline commit ✓, 3 full-length RoEx tracks ✓, 4 local autotune ✓, 5 refinement versions ✓, 6 mobile nav/text size/landing audio ✓.
-- **Next task:** Production-readiness pass of 2026-10-27 complete (plan limits, MP3 export, account deletion, RoEx protection, backups, alerts, accessibility, dependencies). Excluded by the owner for now: Stripe, production secrets, staging test, Clerk production setup, hosting. Next candidates: Stripe checkout writing `subscriptions` rows, or the local "level 1" mixing engine.
-- **Blockers/dependencies:** Owner actions: real support/privacy inboxes and the LLC's state for the legal pages, a lawyer's review, RoEx Auto Top-Up, an alert webhook URL, a daily backup schedule with off-machine copies, and a manual screen-reader pass. Production Clerk instance/domain, payments, hosting and staging remain unconfigured. Dependency audits are clean (2026-10-27). Credentials remain user-maintained in [credentials.md](credentials.md); never display their values.
+- **Next task:** Production-readiness pass of 2026-10-27 complete (plan limits, MP3 export, account deletion, RoEx protection, backups, alerts, accessibility, dependencies). Excluded by the owner for now: Stripe, production secrets, staging test, Clerk production setup. Hosting chosen 2026-11-02: Railway for everything, defined in `.railway/railway.ts` (not yet applied; first-deploy steps in README). Next candidates: Stripe checkout writing `subscriptions` rows, or the local "level 1" mixing engine.
+- **Blockers/dependencies:** Owner actions: real support/privacy inboxes and the LLC's state for the legal pages, a lawyer's review, RoEx Auto Top-Up, an alert webhook URL, a daily backup schedule with off-machine copies, and a manual screen-reader pass. Production Clerk instance/domain, payments and staging remain unconfigured; the Railway project has not been created or deployed yet. Dependency audits are clean (2026-10-27). Credentials remain user-maintained in [credentials.md](credentials.md); never display their values.
 
 ## Phase status
 
@@ -40,6 +40,8 @@ Plans live in `web/src/lib/plans.ts`. Monthly prices follow Easymix (Pro €34.9
 - Not yet built: Stripe checkout and webhooks.
 
 ## Work log
+
+- 2026-11-02: Hosting moved to Railway (replaces the Vercel `vercel.json`, now removed). Added `.railway/railway.ts` (Railway infrastructure as code, type-checked against `railway@3.16.0`): web, api, processor, Postgres, Redis and a private `audio` bucket, with secrets kept out of the file (shared `INTERNAL_API_SECRET`, `preserve()` for Clerk, RoEx and webhook values). The worker image now builds from the repository root (`.dockerignore` allowlist) and carries `database/`; new `python -m app.release` applies `init.sql` and all migrations and sets bucket CORS from `S3_CORS_ORIGINS`. S3 clients share one helper with `S3_ADDRESSING_STYLE` (path locally, virtual on Railway). Verified locally: image build, release step on the live and on an empty database (10 tables each), CORS set and reset on local storage, storage and presigned-URL round trip, processor heartbeat, 54 worker tests pass. Not yet applied to Railway.
 
 - 2026-10-27: Logo. Generated five SVG logo concepts (Barlow Condensed lettering outlined to paths, OFL) in `brand/logo-concepts/`; the owner chose concept 4 "raw to mixed". It is now the site, studio and sign-in header logo (`web/public/brand/`), the browser icon (`app/icon.svg`, `favicon.ico`) and the Apple touch icon. Hid the Next.js development "N" button with `devIndicators: false` (errors still show). Verified at 1280 and 390 px with no overflow.
 

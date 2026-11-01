@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from .audio import STREAMING_TRUE_PEAK_DB, measure_true_peak
 from .direction import describe, refine, settings_from_prompt
 from .plans import PLANS, claim_full_track, claim_preview, plan_for, release
-from .uploads import database_url, find_owner, require_internal_app, storage_client
+from .uploads import database_url, find_owner, require_internal_app, s3_client, storage_client
 
 router = APIRouter(prefix="/api/projects", tags=["jobs"])
 QUEUE_NAME = "fastmix:jobs"
@@ -272,19 +272,8 @@ def download_output(
             key = ensure_mp3(client, os.environ["S3_BUCKET"], key)
         except Exception as error:
             raise HTTPException(status_code=503, detail="The MP3 could not be prepared. Please retry.") from error
-    public_client = client
     public_endpoint = os.getenv("S3_PUBLIC_ENDPOINT_URL")
-    if public_endpoint:
-        import boto3
-        from botocore.config import Config
-        public_client = boto3.client(
-            "s3",
-            endpoint_url=public_endpoint,
-            aws_access_key_id=os.environ["S3_ACCESS_KEY"],
-            aws_secret_access_key=os.environ["S3_SECRET_KEY"],
-            region_name=os.getenv("S3_REGION", "us-east-1"),
-            config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
-        )
+    public_client = s3_client(public_endpoint) if public_endpoint else client
     url = public_client.generate_presigned_url(
         "get_object",
         Params={"Bucket": os.environ["S3_BUCKET"], "Key": key, "ResponseContentDisposition": f"{'inline' if inline else 'attachment'}; filename=fastmix-{output['render']}.{file_format}"},

@@ -25,7 +25,7 @@ This checklist reflects the current local preview. A checked code item does not 
 
 - [ ] Integrate a production identity provider and enforce authenticated ownership on every account and media route.
 - [ ] Set unique production secrets in a secret manager. Do not reuse values from `.env.example` or local Compose defaults.
-- [ ] Use HTTPS, private network policies, and managed PostgreSQL, Redis, and object storage with least-privilege service identities.
+- [ ] Use HTTPS, private network policies, and managed PostgreSQL, Redis, and object storage with least-privilege service identities. Railway chosen 2026-11-02 and defined in `.railway/railway.ts` (web public, api private, managed Postgres/Redis, private bucket); not yet applied or verified on Railway.
 - [ ] Configure storage lifecycle/retention, verify audio deletion, and document data processing and backup retention.
 - [ ] Define and test database backups, restore, migration rollback, and disaster recovery. Backup, restore check and restore drill scripts written and verified locally on 2026-10-27; still needed: a daily schedule, off-machine copies, and migration rollback steps.
 - [ ] Configure structured operational logs, error reporting, queue/worker metrics, alerts, and retention without logging private audio or credentials. Built-in alerts, watchdog and `/ops/status` added 2026-10-27; still needed: a real webhook URL, log retention on the host, and optionally a hosted error tracker.

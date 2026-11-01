@@ -1,0 +1,7 @@
+# The worker image builds from the repository root but needs only these paths.
+# Everything else (web, songs, backups, credentials) stays out of the build context.
+*
+!worker/requirements.txt
+!worker/app/
+!database/
+**/__pycache__

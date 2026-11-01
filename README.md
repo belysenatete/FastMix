@@ -34,6 +34,21 @@ Worker unit tests run inside the API image: `docker compose run --rm -v ./worker
 
 Audio uploads require the Compose API and private object storage. See `phases.md`, `projectDescription.md`, `projectTracker.md`, and `codingPrinciples.md` for product scope and implementation status.
 
+## Deploying to Railway
+
+Hosting is Railway, described in code in [.railway/railway.ts](.railway/railway.ts): `web` (Next.js, built with Railpack from `web/`), `api` (FastAPI), `processor` (the job worker, same image as `api`), Postgres, Redis and an `audio` storage bucket. The worker image builds from the repository root so it can carry `database/`; before each `api` deploy Railway runs `python -m app.release`, which applies `init.sql` and every migration (all idempotent) and sets the bucket's CORS rule for the website. Only `web` should get a public domain; `api` is reached over Railway's private network.
+
+First deploy:
+
+1. Install the [Railway CLI](https://docs.railway.com/cli), then `railway login`, and `railway link` to a new empty project. Connect the GitHub repository to Railway when asked.
+2. In the project's **Shared Variables**, add `INTERNAL_API_SECRET` with a new long random value (for example `openssl rand -hex 32`) and seal it.
+3. `cd .railway && npm install && npm run check`, then `railway config plan` to review and `railway config apply` to create everything.
+4. In the dashboard, set the secrets the config keeps with `preserve()`: on `web`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` from the Clerk **production** instance; on `processor`, `ROEX_API_KEY`; and optionally `ALERT_WEBHOOK_URL` on all three services. Seal each one.
+5. On `web`, **Settings → Networking → Generate Domain** (or add your own domain), then redeploy `api` so `WEB_ORIGIN` and the bucket CORS rule pick it up. Add the same domain to the Clerk production instance.
+6. Open the site, sign in, upload a track and run a preview to confirm the whole path works.
+
+Later changes to `.railway/railway.ts` go through `railway config plan` and `railway config apply`; code changes deploy on every push to `main`. Railway's buckets have no versioning or lifecycle rules, and `scripts/backup.sh` only covers the local Compose stack, so turn on Railway's Postgres backups and plan a separate copy of the bucket.
+
 ## Backups
 
 Run these from the repository root with the Compose stack running (Git Bash on Windows).

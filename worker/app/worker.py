@@ -6,17 +6,15 @@ import time
 import uuid
 from pathlib import Path
 
-import boto3
 import psycopg
 import redis
-from botocore.config import Config
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from .jobs import QUEUE_NAME
 from .alerts import HEARTBEAT_KEY, alert
 from .plans import release
-from .uploads import database_url
+from .uploads import database_url, s3_client
 from .roex import RoExError, create_full as create_roex_full, create_preview as create_roex_preview
 from .audio import LOUDNESS_TARGET_LUFS, finish_loudness, local_mix_graph
 from .direction import settings_from_prompt
@@ -33,17 +31,6 @@ def db_connection():
 
 def redis_connection():
     return redis.Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"), socket_timeout=10, decode_responses=True)
-
-
-def s3_client():
-    return boto3.client(
-        "s3",
-        endpoint_url=os.environ["S3_ENDPOINT_URL"],
-        aws_access_key_id=os.environ["S3_ACCESS_KEY"],
-        aws_secret_access_key=os.environ["S3_SECRET_KEY"],
-        region_name=os.getenv("S3_REGION", "us-east-1"),
-        config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
-    )
 
 
 def update_job(job_id: uuid.UUID, progress: int, status: str | None = None):

@@ -43,18 +43,23 @@ def database_url() -> str:
     return value
 
 
+def s3_client(endpoint_url: str | None = None):
+    # Local MinIO-compatible storage needs path-style URLs; Railway buckets use virtual-hosted style.
+    return boto3.client(
+        "s3",
+        endpoint_url=endpoint_url or os.environ["S3_ENDPOINT_URL"],
+        aws_access_key_id=os.environ["S3_ACCESS_KEY"],
+        aws_secret_access_key=os.environ["S3_SECRET_KEY"],
+        region_name=os.getenv("S3_REGION", "us-east-1"),
+        config=Config(signature_version="s3v4", s3={"addressing_style": os.getenv("S3_ADDRESSING_STYLE", "path")}),
+    )
+
+
 def storage_client():
     required = ["S3_ENDPOINT_URL", "S3_ACCESS_KEY", "S3_SECRET_KEY", "S3_BUCKET"]
     if any(not os.getenv(name) for name in required):
         raise HTTPException(status_code=503, detail="Private audio storage is not configured")
-    return boto3.client(
-        "s3",
-        endpoint_url=os.environ["S3_ENDPOINT_URL"],
-        aws_access_key_id=os.environ["S3_ACCESS_KEY"],
-        aws_secret_access_key=os.environ["S3_SECRET_KEY"],
-        region_name=os.getenv("S3_REGION", "us-east-1"),
-        config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
-    )
+    return s3_client()
 
 
 def find_owner(connection, user_id: str, project_id: uuid.UUID):
