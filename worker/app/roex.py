@@ -26,6 +26,9 @@ from .vocals import VOCAL_CATEGORIES
 BASE_URL = "https://tonn.roexaudio.com"
 POLL_SECONDS = 5
 POLL_TIMEOUT_SECONDS = 900
+# Recombine normally finishes a preview in one to two minutes but has been seen to stay "processing"
+# indefinitely; after this long the preview falls back to the multitrack mixer (see create_preview).
+RECOMBINE_WAIT_SECONDS = 300
 MAX_OUTPUT_BYTES = 500 * 1024 * 1024
 logger = logging.getLogger("fastmix.roex")
 
@@ -36,6 +39,10 @@ class RoExError(RuntimeError):
     def __init__(self, message: str, code: str = "provider_failed"):
         super().__init__(message)
         self.code = code
+
+
+class RoExTimeout(RoExError):
+    """RoEx kept answering that a task was still running until the wait ran out."""
 
 
 RETRY_DELAYS_SECONDS = (2, 6)
@@ -194,11 +201,18 @@ def _prepare_track(source: Path, target: Path, max_duration_seconds: int, gain_d
     )
 
 
-def _poll(path: str, payload: dict | None, extract, method: str = "POST") -> object:
+def _poll(path: str, payload: dict | None, extract, method: str = "POST", timeout_seconds: int = POLL_TIMEOUT_SECONDS) -> object:
     """Call an endpoint until it stops answering 202 and `extract` finds a result."""
-    deadline = time.monotonic() + POLL_TIMEOUT_SECONDS
+    started = time.monotonic()
+    deadline = started + timeout_seconds
+    last_state, next_log = "", started
     while time.monotonic() < deadline:
         status, response = _api_request(path, payload, method)
+        # Log what RoEx is answering about once a minute, so a slow or stuck task can be told apart.
+        last_state = f"HTTP {status} {response.get('status', '') if isinstance(response, dict) else ''}".strip()
+        if time.monotonic() >= next_log:
+            logger.info("Waiting on RoEx %s: %s after %ds", path.split("/")[1], last_state, time.monotonic() - started)
+            next_log = time.monotonic() + 60
         if status == 202:
             time.sleep(POLL_SECONDS)
             continue
@@ -208,7 +222,7 @@ def _poll(path: str, payload: dict | None, extract, method: str = "POST") -> obj
         if result:
             return result
         time.sleep(POLL_SECONDS)
-    raise RoExError("RoEx Tonn processing timed out")
+    raise RoExTimeout(f"RoEx Tonn processing timed out (last answer: {last_state})")
 
 
 def _task_id(created: dict, *keys: str) -> str | None:
@@ -244,9 +258,9 @@ def _streaming_safe(output: Path, output_format: str, workdir: Path) -> tuple[Pa
     return (output, output_format) if limited == output else (limited, "wav")
 
 
-def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress) -> tuple[Path, str, dict]:
+def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress, workflow: str | None = None) -> tuple[Path, str, dict]:
     """Create a free 30-second AI preview. Returns the local file, its format, and provider data."""
-    workflow = plan(job)
+    workflow = workflow or plan(job)
     settings = job["settings"]
     max_duration_seconds = 10 * 60 if workflow == "master" else 8 * 60
     prepared: list[Path] = []
@@ -292,7 +306,12 @@ def create_preview(job: dict, source_paths: list[Path], workdir: Path, progress)
                 raise RoExError("RoEx Tonn could not mix this vocal and beat", "invalid_audio")
             return str(response.get("status", "")).lower() == "complete"
 
-        _poll(f"/recombinestatus/{task_id}", None, recombine_done, method="GET")
+        try:
+            _poll(f"/recombinestatus/{task_id}", None, recombine_done, method="GET", timeout_seconds=RECOMBINE_WAIT_SECONDS)
+        except RoExTimeout:
+            # Previews are free, so trying the multitrack mixer with the same beat and vocal costs nothing.
+            logger.warning("RoEx recombine task %s did not finish in %ds; using the multitrack mixer instead", task_id, RECOMBINE_WAIT_SECONDS)
+            return create_preview(job, source_paths, workdir, progress, workflow="multitrack")
         progress(70)
 
         def preview_ready(response: dict):

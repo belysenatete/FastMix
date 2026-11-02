@@ -33,7 +33,7 @@ class RefineRequest(BaseModel):
 def queue_client():
     redis_url = os.getenv("REDIS_URL")
     if not redis_url:
-        raise HTTPException(status_code=503, detail="The local job queue is not configured")
+        raise HTTPException(status_code=503, detail="The job queue is not configured")
     return redis.Redis.from_url(redis_url, socket_timeout=5, decode_responses=True)
 
 

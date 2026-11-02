@@ -18,7 +18,7 @@ FastMix is a local-first music mixing studio MVP, inspired by the observed Easym
 
 To enable RoEx AI mixing and mastering, create a Tonn API account at [tonn-portal.roexaudio.com](https://tonn-portal.roexaudio.com) and request API access (new accounts get 1,000 free credits). Add the key to the ignored root `.env` file as `ROEX_API_KEY=your_key`, then rebuild with `docker compose up -d --build api processor`. Without this key the app uses local FFmpeg. With RoEx enabled, audio is uploaded to RoEx Tonn and each session picks a workflow:
 
-- **One beat + one vocal:** RoEx recombine mixes the vocal onto the beat and masters it, with genre styles such as trap, afrobeat and reggaeton.
+- **One beat + one vocal:** RoEx recombine mixes the vocal onto the beat and masters it, with genre styles such as trap, afrobeat and reggaeton. If recombine is still "processing" after 5 minutes (seen on 2026-11-02, while mastering and multitrack answered in about a minute), the preview switches to the multitrack mixer automatically.
 - **Two or more stems:** RoEx multitrack mix, then local two-pass loudness finishing.
 - **One finished track (Master mode):** RoEx mastering.
 

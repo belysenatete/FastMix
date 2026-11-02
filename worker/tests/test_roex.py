@@ -120,6 +120,25 @@ class PreviewTests(unittest.TestCase):
             roex.create_preview(job, [Path("a"), Path("b")], self.workdir, lambda _: None)
         self.assertEqual(raised.exception.code, "invalid_audio")
 
+    def test_stuck_recombine_falls_back_to_the_multitrack_mixer(self):
+        api = FakeApi({
+            "/recombine": [(200, {"recombineTaskId": "rc_3"})],
+            "/recombinestatus/rc_3": [(202, {"status": "processing"})] * 3,
+            "/mixpreview": [(200, {"multitrack_task_id": "mt_3"})],
+            "/retrievepreviewmix": [(200, {"previewMixTaskResults": {"download_url_preview_mixed": "https://roex.test/mix.wav"}})],
+        })
+        job = {"project_type": "mix", "settings": settings_from_prompt("afrobeats, vocals upfront"), "tracks": [track("beat"), track("lead_vocal")]}
+        # A clock that jumps a minute per reading runs the recombine wait out after a few polls.
+        clock = iter(range(0, 100_000, 60))
+        with mock.patch.object(roex, "_api_request", api), mock.patch.object(roex.time, "monotonic", side_effect=lambda: next(clock)), \
+                mock.patch.object(roex, "finish_loudness", side_effect=lambda source, target, lufs: target):
+            _, output_format, provider_data = roex.create_preview(job, [Path("a"), Path("b")], self.workdir, lambda _: None)
+        self.assertIn("/recombinestatus/rc_3", api.paths())
+        self.assertEqual(provider_data["workflow"], "multitrack")
+        self.assertEqual(provider_data["task_id"], "mt_3")
+        self.assertEqual([item["presenceSetting"] for item in api.calls[-2][1]["multitrackData"]["trackData"]], ["NORMAL", "LEAD"])
+        self.assertEqual(output_format, "wav")
+
     def test_multitrack_preview_is_loudness_finished_and_keeps_track_urls(self):
         api = FakeApi({
             "/mixpreview": [(200, {"multitrack_task_id": "mt_1"})],

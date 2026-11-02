@@ -2,6 +2,7 @@ import logging
 import os
 import subprocess
 import tempfile
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -211,12 +212,22 @@ def recover_stale_jobs():
         logger.info("Requeued %s stale jobs", len(rows))
 
 
+def beat_heart():
+    """Check in every 30 seconds, including while a long RoEx job blocks the main loop."""
+    while True:
+        try:
+            redis_connection().set(HEARTBEAT_KEY, int(time.time()))
+        except Exception:
+            logger.warning("Could not record the processor heartbeat")
+        time.sleep(30)
+
+
 def main():
+    # The watchdog reads this to tell a quiet processor from a dead one.
+    threading.Thread(target=beat_heart, name="fastmix-heartbeat", daemon=True).start()
     queue = redis_connection()
     while True:
         try:
-            # The API's watchdog reads this to tell a quiet processor from a dead one.
-            queue.set(HEARTBEAT_KEY, int(time.time()))
             message = queue.blpop(QUEUE_NAME, timeout=5)
             if message:
                 try:

@@ -156,7 +156,7 @@ export default function MixerWorkspace() {
   async function startProcessing(retry = false) {
     if (!project) return;
     setJobPending(true);
-    setNotice(retry ? "Re-adding this job to the local processor…" : "Adding your session to the local preview queue…");
+    setNotice(retry ? "Trying this version again…" : "Starting your preview…");
     try {
       if (project.projectType === "master" && project.tracks.length !== 1) throw new Error("A mastering preview needs exactly one finished track.");
       const saved = await fetch(`/api/projects/${encodeURIComponent(project.id)}`, {
@@ -166,7 +166,7 @@ export default function MixerWorkspace() {
       });
       if (!saved.ok) {
         const saveError = await saved.json().catch(() => ({})) as { detail?: string; error?: string };
-        throw new Error(saveError.detail || saveError.error || "Start PostgreSQL before queueing a preview.");
+        throw new Error(saveError.detail || saveError.error || setupMessage("Start PostgreSQL before queueing a preview."));
       }
       const base = `/api/projects/${encodeURIComponent(project.id)}/jobs`;
       const url = retry && job ? `${base}/${encodeURIComponent(job.id)}/retry` : base;
