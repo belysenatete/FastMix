@@ -1,0 +1,3 @@
+# Tells Vercel where the FastAPI app lives. Dependencies stay in requirements.txt, which Vercel and the Dockerfile both install.
+[tool.vercel]
+entrypoint = "app.api:app"

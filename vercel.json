@@ -15,8 +15,7 @@
     },
     "worker": {
       "root": "worker",
-      "framework": "fastapi",
-      "entrypoint": "app.api:app"
+      "framework": "fastapi"
     }
   },
   "rewrites": [
