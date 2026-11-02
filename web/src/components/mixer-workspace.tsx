@@ -254,13 +254,18 @@ export default function MixerWorkspace() {
     const allowed = /\.(wav|mp3|flac|aiff?|m4a|ogg)$/i.test(file.name);
     if (!file.type.startsWith("audio/") && !allowed) { setNotice("Choose an audio file such as WAV, MP3, FLAC, AIFF, M4A, or OGG."); return; }
     if (file.size > 100 * 1024 * 1024) { setNotice("This preview accepts files up to 100 MB."); return; }
-    const form = new FormData();
-    form.set("category", category);
-    form.set("file", file, file.name);
     setUploading(true);
     setNotice("Uploading to private audio storage…");
     try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(project.id)}/tracks`, { method: "POST", body: form });
+      // 1. Get a signed link, 2. send the file straight to storage, 3. have the API check and add it.
+      const tracksUrl = `/api/projects/${encodeURIComponent(project.id)}/tracks`;
+      const json = { "Content-Type": "application/json" };
+      const linkResponse = await fetch(`${tracksUrl}/uploads`, { method: "POST", headers: json, body: JSON.stringify({ filename: file.name, category, size_bytes: file.size }) });
+      const link = await linkResponse.json().catch(() => ({})) as { trackId?: string; url?: string; contentType?: string; detail?: string; error?: string };
+      if (!linkResponse.ok || !link.trackId || !link.url) throw new Error(link.detail || link.error || "The audio upload could not be started.");
+      const stored = await fetch(link.url, { method: "PUT", headers: { "Content-Type": link.contentType || "application/octet-stream" }, body: file });
+      if (!stored.ok) throw new Error("The audio could not be sent to storage. Please retry.");
+      const response = await fetch(tracksUrl, { method: "POST", headers: json, body: JSON.stringify({ track_id: link.trackId, filename: file.name, category }) });
       const body = await response.json().catch(() => ({})) as { track?: { id: string; category: TrackCategory; original_name: string; mime_type: string; size_bytes: number; created_at?: string }; detail?: string; error?: string };
       if (!response.ok || !body.track) throw new Error(body.detail || body.error || "The audio upload could not be completed.");
       const track: TrackRecord = { id: body.track.id, name: body.track.original_name, category: body.track.category, mimeType: body.track.mime_type, sizeBytes: body.track.size_bytes, lastModified: body.track.created_at ? Date.parse(body.track.created_at) : file.lastModified };

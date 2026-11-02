@@ -7,13 +7,10 @@ export async function proxyWorker(request: Request, workerPath: string, method: 
   const internalSecret = process.env.INTERNAL_API_SECRET;
   if (!internalSecret) return NextResponse.json({ error: "The private audio service is not configured." }, { status: 503 });
 
-  const isTrackUpload = method === "POST" && workerPath.endsWith("/tracks");
-  if (isTrackUpload) {
-    const contentLength = Number(request.headers.get("content-length") || "0");
-    if (contentLength > 105 * 1024 * 1024) return NextResponse.json({ error: "Audio files must be 100 MB or smaller." }, { status: 413 });
-    if (!request.headers.get("content-type")?.startsWith("multipart/form-data;")) {
-      return NextResponse.json({ error: "Send the track as a multipart audio upload." }, { status: 415 });
-    }
+  // Audio never passes through here: the browser uploads it straight to storage with a signed link
+  // (see /tracks/uploads), so every request this proxies is small JSON.
+  if (method === "POST" && Number(request.headers.get("content-length") || "0") > 64 * 1024) {
+    return NextResponse.json({ error: "Request too large." }, { status: 413 });
   }
 
   const headers = new Headers({

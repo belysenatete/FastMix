@@ -16,7 +16,9 @@ from .account import router as account_router
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    start_watchdog()
+    # Vercel functions don't keep a background thread alive; there the processor runs the watchdog.
+    if not os.getenv("VERCEL"):
+        start_watchdog()
     yield
 
 

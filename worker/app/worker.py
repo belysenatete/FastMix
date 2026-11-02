@@ -12,7 +12,8 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from .jobs import QUEUE_NAME
-from .alerts import HEARTBEAT_KEY, alert
+from .alerts import HEARTBEAT_KEY, alert, start_watchdog
+from .delivery import MP3_REQUEST_PREFIX, ensure_mp3
 from .plans import release
 from .uploads import database_url, s3_client
 from .roex import RoExError, create_full as create_roex_full, create_preview as create_roex_preview
@@ -163,6 +164,13 @@ def process_job(job_id: uuid.UUID):
                 connection.execute("UPDATE processing_jobs SET status = 'completed', progress = 100, error_code = NULL, updated_at = now() WHERE id = %s", (job_id,))
                 connection.execute("UPDATE projects SET status = 'completed', updated_at = now() WHERE id = %s", (job["project_id"],))
         logger.info("Completed %s %s job %s", job["processor"], job["render"], job_id)
+        if job["render"] == "full" and output_format == "wav":
+            # Make the MP3 now so downloads are instant. The track is already delivered, so a failure here
+            # only means the download asks for the MP3 again (see make_mp3).
+            try:
+                ensure_mp3(client, bucket, output_key)
+            except Exception:
+                logger.exception("Could not make the MP3 for job %s", job_id)
     except RoExError as error:
         mark_failed(job_id, job["project_id"], error.code)
         logger.warning("RoEx %s job %s failed (%s): %s", job["render"], job_id, error.code, error)
@@ -170,6 +178,23 @@ def process_job(job_id: uuid.UUID):
         mark_failed(job_id, job["project_id"])
         logger.exception("%s processing failed for job %s", job["render"].capitalize(), job_id)
         alert("job_crashed", f"A {job['render']} job ({job_id}) failed with an unexpected {type(error).__name__}. See the processor log.")
+
+
+def make_mp3(job_id: uuid.UUID):
+    """Create the MP3 copy of a finished full render that the download asked for."""
+    with db_connection() as connection:
+        output = connection.execute(
+            "SELECT o.storage_key FROM outputs o JOIN processing_jobs j ON j.id = o.job_id WHERE j.id = %s AND j.render = 'full' AND o.format = 'wav'",
+            (job_id,),
+        ).fetchone()
+    if not output:
+        return
+    try:
+        ensure_mp3(s3_client(), os.environ["S3_BUCKET"], output["storage_key"])
+        logger.info("Made the MP3 for job %s", job_id)
+    except Exception as error:
+        logger.exception("Could not make the MP3 for job %s", job_id)
+        alert("mp3_failed", f"The MP3 for job {job_id} could not be made ({type(error).__name__}). See the processor log.")
 
 
 def recover_stale_jobs():
@@ -195,7 +220,10 @@ def main():
             message = queue.blpop(QUEUE_NAME, timeout=5)
             if message:
                 try:
-                    process_job(uuid.UUID(message[1]))
+                    if message[1].startswith(MP3_REQUEST_PREFIX):
+                        make_mp3(uuid.UUID(message[1].removeprefix(MP3_REQUEST_PREFIX)))
+                    else:
+                        process_job(uuid.UUID(message[1]))
                 except ValueError:
                     logger.warning("Discarded malformed queue message")
                 except Exception:
@@ -208,5 +236,8 @@ def main():
 
 
 if __name__ == "__main__":
+    # Where the API runs on Vercel it has no long-lived process for the watchdog, so the processor runs it.
+    if os.getenv("ALERT_WATCHDOG_IN_PROCESSOR", "").lower() == "true":
+        start_watchdog()
     recover_stale_jobs()
     main()

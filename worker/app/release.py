@@ -25,14 +25,15 @@ def migrate():
 
 
 def configure_cors():
-    # The studio player loads presigned audio with crossOrigin="anonymous", so the bucket must allow the site's origin.
+    # The browser uploads tracks straight to the bucket and the player loads audio with crossOrigin="anonymous",
+    # so the bucket must allow the site's origin to PUT and GET.
     origins = [origin.strip() for origin in os.getenv("S3_CORS_ORIGINS", "").split(",") if origin.strip()]
     if not origins:
         log.info("S3_CORS_ORIGINS is not set; leaving bucket CORS unchanged")
         return
     s3_client().put_bucket_cors(Bucket=os.environ["S3_BUCKET"], CORSConfiguration={"CORSRules": [{
         "AllowedOrigins": origins,
-        "AllowedMethods": ["GET", "HEAD"],
+        "AllowedMethods": ["GET", "HEAD", "PUT"],
         "AllowedHeaders": ["*"],
         "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges", "ETag"],
         "MaxAgeSeconds": 3600,

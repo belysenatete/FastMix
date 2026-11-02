@@ -7,7 +7,7 @@ FastMix is a local-first music mixing studio MVP, inspired by the observed Easym
 - `web/`: Next.js App Router, React, TypeScript
 - `worker/`: FastAPI service and Python audio processor
 - `database/`: PostgreSQL schema
-- Local dependencies: PostgreSQL and Redis via Docker Compose
+- Local dependencies: PostgreSQL, Redis and S3-compatible storage via Docker Compose
 
 ## Local setup
 
@@ -34,20 +34,24 @@ Worker unit tests run inside the API image: `docker compose run --rm -v ./worker
 
 Audio uploads require the Compose API and private object storage. See `phases.md`, `projectDescription.md`, `projectTracker.md`, and `codingPrinciples.md` for product scope and implementation status.
 
-## Deploying to Railway
+## Deploying
 
-Hosting is Railway, described in code in [.railway/railway.ts](.railway/railway.ts): `web` (Next.js, built with Railpack from `web/`), `api` (FastAPI), `processor` (the job worker, same image as `api`), Postgres, Redis and an `audio` storage bucket. The worker image builds from the repository root so it can carry `database/`; before each `api` deploy Railway runs `python -m app.release`, which applies `init.sql` and every migration (all idempotent) and sets the bucket's CORS rule for the website. Only `web` should get a public domain; `api` is reached over Railway's private network.
+- **Vercel** (project `fast-mix`, [vercel.json](vercel.json)) runs the website (`web/`) and the worker API (`worker/`, FastAPI as a Vercel function). The website reaches the API through the `WORKER_API_URL` binding. Only the website is public.
+- **Railway** ([.railway/railway.ts](.railway/railway.ts)) runs the job processor, which needs a long-running process and ffmpeg. Before each deploy it runs `python -m app.release`, which applies `init.sql` and every migration (all idempotent) and sets the bucket's CORS rule. It also makes the MP3 copy of each full track and runs the alert watchdog (`ALERT_WATCHDOG_IN_PROCESSOR=true`), since Vercel functions can't keep a background thread.
+- **Postgres, Redis and S3-compatible storage** are hosted separately; both Vercel and Railway use the same `DATABASE_URL`, `REDIS_URL` and `S3_*` values.
 
-First deploy:
+Audio never passes through Vercel (its requests are capped at 4.5 MB): the browser asks the API for a 15-minute signed link, uploads the file straight to the bucket, then the API checks its size and file signature and adds it to the session, deleting anything that fails. Downloads and playback also use signed links. So the bucket must allow the website's origin to `PUT` and `GET` (set `S3_CORS_ORIGINS` on the processor; `app.release` applies it). Set `S3_ADDRESSING_STYLE=virtual` if your provider rejects path-style URLs.
 
-1. Install the [Railway CLI](https://docs.railway.com/cli), then `railway login`, and `railway link` to a new empty project. Connect the GitHub repository to Railway when asked.
-2. In the project's **Shared Variables**, add `INTERNAL_API_SECRET` with a new long random value (for example `openssl rand -hex 32`) and seal it.
-3. `cd .railway && npm install && npm run check`, then `railway config plan` to review and `railway config apply` to create everything.
-4. In the dashboard, set the secrets the config keeps with `preserve()`: on `web`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` from the Clerk **production** instance; on `processor`, `ROEX_API_KEY`; and optionally `ALERT_WEBHOOK_URL` on all three services. Seal each one.
-5. On `web`, **Settings → Networking → Generate Domain** (or add your own domain), then redeploy `api` so `WEB_ORIGIN` and the bucket CORS rule pick it up. Add the same domain to the Clerk production instance.
-6. Open the site, sign in, upload a track and run a preview to confirm the whole path works.
+Settings:
 
-Later changes to `.railway/railway.ts` go through `railway config plan` and `railway config apply`; code changes deploy on every push to `main`. Railway's buckets have no versioning or lifecycle rules, and `scripts/backup.sh` only covers the local Compose stack, so turn on Railway's Postgres backups and plan a separate copy of the bucket.
+| Where | Variables |
+|---|---|
+| Vercel (all) | `DATABASE_URL`, `REDIS_URL`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_REGION`, `INTERNAL_API_SECRET`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` (Clerk **production** instance), `WEB_ORIGIN` (the site's address), `ROEX_ENABLED=true`; optional `S3_PUBLIC_ENDPOINT_URL`, `S3_ADDRESSING_STYLE`, `ALERT_WEBHOOK_URL` |
+| Railway `processor` | the same `DATABASE_URL`, `REDIS_URL` and `S3_*` values, `S3_CORS_ORIGINS` (the site's address), `ROEX_API_KEY`; optional `ALERT_WEBHOOK_URL` |
+
+First Railway deploy: install the [Railway CLI](https://docs.railway.com/cli), `railway login`, `railway link` to a new empty project, connect the GitHub repository, then `cd .railway && npm install && npm run check && railway config plan` and `railway config apply`. Enter the processor's values in the Railway dashboard and seal the secrets. After that, code deploys on every push to `main` on both platforms.
+
+Vercel's free Hobby plan is for non-commercial use; move to Pro before taking payments. Turn off **Deployment Protection → Vercel Authentication** (or add a custom domain) so visitors don't get a Vercel sign-in page. `scripts/backup.sh` only covers the local Compose stack; turn on your database provider's backups and plan a copy of the bucket.
 
 ## Backups
 

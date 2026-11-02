@@ -5,11 +5,6 @@ const nextConfig: NextConfig = {
   // Hide the development-only "N" tools button; compile and runtime errors still show.
   devIndicators: false,
   partialPrefetching: true,
-  experimental: {
-    // The Clerk proxy buffers request bodies and silently truncates them past this size (default 10 MB),
-    // which corrupted audio uploads. Match the 105 MB request cap enforced in worker-proxy.ts.
-    proxyClientMaxBodySize: "105mb",
-  },
   async headers() {
     const headers = [
       { key: "X-Content-Type-Options", value: "nosniff" },

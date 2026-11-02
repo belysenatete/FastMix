@@ -1,8 +1,5 @@
 import os
-import subprocess
-import tempfile
 import uuid
-from pathlib import Path
 
 import psycopg
 import redis
@@ -11,10 +8,10 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field
 
-from .audio import STREAMING_TRUE_PEAK_DB, measure_true_peak
+from .delivery import MP3_REQUEST_PREFIX, mp3_key_for
 from .direction import describe, refine, settings_from_prompt
 from .plans import PLANS, claim_full_track, claim_preview, plan_for, release
-from .uploads import database_url, find_owner, require_internal_app, s3_client, storage_client
+from .uploads import database_url, find_owner, public_storage_client, require_internal_app, storage_client
 
 router = APIRouter(prefix="/api/projects", tags=["jobs"])
 QUEUE_NAME = "fastmix:jobs"
@@ -220,33 +217,6 @@ def delivery_format(stored: str, render: str, allowed: tuple[str, ...], requeste
     return requested
 
 
-def ensure_mp3(client, bucket: str, wav_key: str) -> str:
-    """Return the key of a 320 kbps MP3 copy of a stored WAV, creating it on first request."""
-    mp3_key = wav_key.rsplit(".", 1)[0] + ".mp3"
-    try:
-        client.head_object(Bucket=bucket, Key=mp3_key)
-        return mp3_key
-    except client.exceptions.ClientError:
-        pass
-    with tempfile.TemporaryDirectory(prefix="fastmix-mp3-") as temp_dir:
-        source, target = Path(temp_dir) / "source.wav", Path(temp_dir) / "track.mp3"
-        client.download_file(bucket, wav_key, str(source))
-
-        def encode(gain_db: float):
-            subprocess.run(
-                ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source), "-af", f"volume={gain_db:.2f}dB", "-c:a", "libmp3lame", "-b:a", "320k", "-ar", "44100", str(target)],
-                check=True, timeout=300, capture_output=True,
-            )
-
-        encode(0.0)
-        # MP3 encoding can push inter-sample peaks above the WAV's; turn it down just enough to stay streaming-safe.
-        overshoot = measure_true_peak(target) - STREAMING_TRUE_PEAK_DB
-        if overshoot > 0:
-            encode(-(overshoot + 0.1))
-        client.upload_file(str(target), bucket, mp3_key, ExtraArgs={"ContentType": "audio/mpeg"})
-    return mp3_key
-
-
 @router.get("/{project_id}/jobs/{job_id}/download")
 def download_output(
     project_id: uuid.UUID,
@@ -265,16 +235,20 @@ def download_output(
     if not output:
         raise HTTPException(status_code=404, detail="No completed output is available")
     file_format = delivery_format(output["format"], output["render"], allowed, requested_format)
-    client = storage_client()
     key = output["storage_key"]
     if file_format != output["format"]:
+        # The processor makes the MP3 when a full track finishes; ask it again if that copy is missing.
+        key = mp3_key_for(key)
+        client = storage_client()
         try:
-            key = ensure_mp3(client, os.environ["S3_BUCKET"], key)
-        except Exception as error:
-            raise HTTPException(status_code=503, detail="The MP3 could not be prepared. Please retry.") from error
-    public_endpoint = os.getenv("S3_PUBLIC_ENDPOINT_URL")
-    public_client = s3_client(public_endpoint) if public_endpoint else client
-    url = public_client.generate_presigned_url(
+            client.head_object(Bucket=os.environ["S3_BUCKET"], Key=key)
+        except client.exceptions.ClientError as error:
+            try:
+                queue_client().rpush(QUEUE_NAME, f"{MP3_REQUEST_PREFIX}{job_id}")
+            except Exception:
+                pass
+            raise HTTPException(status_code=409, detail="The MP3 is still being prepared. Try again in a minute.") from error
+    url = public_storage_client().generate_presigned_url(
         "get_object",
         Params={"Bucket": os.environ["S3_BUCKET"], "Key": key, "ResponseContentDisposition": f"{'inline' if inline else 'attachment'}; filename=fastmix-{output['render']}.{file_format}"},
         ExpiresIn=900,
