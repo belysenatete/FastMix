@@ -47,7 +47,7 @@ def database_url() -> str:
 
 
 def s3_client(endpoint_url: str | None = None):
-    # Local MinIO-compatible storage needs path-style URLs; Railway buckets use virtual-hosted style.
+    # Local MinIO-compatible storage needs path-style URLs; some hosted providers need virtual-hosted style.
     return boto3.client(
         "s3",
         endpoint_url=endpoint_url or os.environ["S3_ENDPOINT_URL"],

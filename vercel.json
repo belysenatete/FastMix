@@ -19,6 +19,15 @@
       "entrypoint": "app.api:app"
     }
   },
+  "daemons": {
+    "processor": {
+      "root": "./",
+      "entrypoint": "worker/Dockerfile",
+      "command": ["sh", "-c", "python -m app.release && ALERT_WATCHDOG_IN_PROCESSOR=true exec python -m app.worker"],
+      "instances": { "iad1": 1 },
+      "resources": { "requests": { "memory": "1Gi" } }
+    }
+  },
   "rewrites": [
     {
       "source": "/(.*)",

@@ -14,6 +14,3 @@ __pycache__/
 
 # Local backups made by scripts/backup.sh.
 /backups/
-
-# Railway infrastructure-as-code tooling.
-/.railway/node_modules/

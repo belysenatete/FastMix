@@ -1,4 +1,4 @@
-"""Release step run before each API deploy: bring the schema up to date and set storage CORS.
+"""Release step run each time the processor starts: bring the schema up to date and set storage CORS.
 
 Every SQL file is idempotent, so running init.sql and then each migration is safe on a new or existing database.
 """
@@ -43,4 +43,8 @@ def configure_cors():
 
 if __name__ == "__main__":
     migrate()
-    configure_cors()
+    try:
+        configure_cors()
+    except Exception:
+        # Some providers manage CORS only in their dashboard; don't keep the processor from starting.
+        log.exception("Could not set the bucket's CORS rule; set it in the storage provider's dashboard instead")

@@ -36,20 +36,26 @@ Audio uploads require the Compose API and private object storage. See `phases.md
 
 ## Deploying
 
-- **Vercel** (project `fast-mix`, [vercel.json](vercel.json)) runs the website (`web/`) and the worker API (`worker/`, FastAPI as a Vercel function). The website reaches the API through the `WORKER_API_URL` binding. Only the website is public.
-- **Railway** ([.railway/railway.ts](.railway/railway.ts)) runs the job processor, which needs a long-running process and ffmpeg. Before each deploy it runs `python -m app.release`, which applies `init.sql` and every migration (all idempotent) and sets the bucket's CORS rule. It also makes the MP3 copy of each full track and runs the alert watchdog (`ALERT_WATCHDOG_IN_PROCESSOR=true`), since Vercel functions can't keep a background thread.
-- **Postgres, Redis and S3-compatible storage** are hosted separately; both Vercel and Railway use the same `DATABASE_URL`, `REDIS_URL` and `S3_*` values.
+Everything runs in the Vercel project `fast-mix`, set up in [vercel.json](vercel.json), and deploys on every push to `main`:
 
-Audio never passes through Vercel (its requests are capped at 4.5 MB): the browser asks the API for a 15-minute signed link, uploads the file straight to the bucket, then the API checks its size and file signature and adds it to the session, deleting anything that fails. Downloads and playback also use signed links. So the bucket must allow the website's origin to `PUT` and `GET` (set `S3_CORS_ORIGINS` on the processor; `app.release` applies it). Set `S3_ADDRESSING_STYLE=virtual` if your provider rejects path-style URLs.
+- **`web` service:** the website (`web/`). It reaches the API through the `WORKER_API_URL` binding and is the only public part.
+- **`worker` service:** the worker API (`worker/`, FastAPI as a Vercel function).
+- **`processor` daemon (beta):** the job processor, built from `worker/Dockerfile` with the repository root as context, one 1 GB instance in `iad1`. On start it runs `python -m app.release`, which applies `init.sql` and every migration (all idempotent) and sets the bucket's CORS rule, then the processor. It makes the MP3 copy of each full track and runs the alert watchdog, since Vercel functions can't keep a background thread. Hobby includes 5 hours of daemon CPU and 420 GB-hours of memory a month; one 1 GB instance running all month uses about 730 GB-hours, so expect it to stop partway through the month on Hobby. Check usage under the project's **Usage** tab, or `vercel daemons ls` with the CLI.
+- **Postgres, Redis and S3-compatible storage** are hosted elsewhere; the services and the daemon share the project's `DATABASE_URL`, `REDIS_URL` and `S3_*` values.
+
+Audio never passes through Vercel (its requests are capped at 4.5 MB): the browser asks the API for a 15-minute signed link, uploads the file straight to the bucket, then the API checks its size and file signature and adds it to the session, deleting anything that fails. Downloads and playback also use signed links. So the bucket must allow the website's origin to `PUT` and `GET`: set `S3_CORS_ORIGINS` and `app.release` applies it, or set the rule in the storage provider's dashboard if it doesn't accept CORS changes through the S3 API. Set `S3_ADDRESSING_STYLE=virtual` if your provider rejects path-style URLs.
 
 Settings:
 
-| Where | Variables |
+| Group | Variables (all Production environment variables in the Vercel project) |
 |---|---|
-| Vercel (all) | `DATABASE_URL`, `REDIS_URL`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_REGION`, `INTERNAL_API_SECRET`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` (Clerk **production** instance), `WEB_ORIGIN` (the site's address), `ROEX_ENABLED=true`; optional `S3_PUBLIC_ENDPOINT_URL`, `S3_ADDRESSING_STYLE`, `ALERT_WEBHOOK_URL` |
-| Railway `processor` | the same `DATABASE_URL`, `REDIS_URL` and `S3_*` values, `S3_CORS_ORIGINS` (the site's address), `ROEX_API_KEY`; optional `ALERT_WEBHOOK_URL` |
+| Shared | `DATABASE_URL`, `REDIS_URL`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_REGION`, `INTERNAL_API_SECRET` |
+| Website | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` (Clerk **production** instance) |
+| API | `WEB_ORIGIN` (the site's address), `ROEX_ENABLED=true` |
+| Processor | `ROEX_API_KEY`, `S3_CORS_ORIGINS` (the site's address) |
+| Optional | `S3_PUBLIC_ENDPOINT_URL`, `S3_ADDRESSING_STYLE`, `ALERT_WEBHOOK_URL` |
 
-First Railway deploy: install the [Railway CLI](https://docs.railway.com/cli), `railway login`, `railway link` to a new empty project, connect the GitHub repository, then `cd .railway && npm install && npm run check && railway config plan` and `railway config apply`. Enter the processor's values in the Railway dashboard and seal the secrets. After that, code deploys on every push to `main` on both platforms.
+Changing a variable takes effect on the next deploy; redeploy to restart the processor with new values.
 
 Vercel's free Hobby plan is for non-commercial use; move to Pro before taking payments. Turn off **Deployment Protection → Vercel Authentication** (or add a custom domain) so visitors don't get a Vercel sign-in page. `scripts/backup.sh` only covers the local Compose stack; turn on your database provider's backups and plan a copy of the bucket.
 
