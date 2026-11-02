@@ -70,7 +70,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: worker/Dockerfile
+      dockerfile: worker.Dockerfile
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://fastmix:${POSTGRES_PASSWORD:-fastmix_dev_only}@db:5432/fastmix
@@ -104,7 +104,7 @@ services:
   processor:
     build:
       context: .
-      dockerfile: worker/Dockerfile
+      dockerfile: worker.Dockerfile
     command: ["python", "-m", "app.worker"]
     restart: unless-stopped
     environment:
