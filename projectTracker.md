@@ -1,6 +1,6 @@
 # Project tracker
 
-Last updated: 2026-11-02
+Last updated: 2026-11-03
 
 ## Current status
 
@@ -40,6 +40,8 @@ Plans live in `web/src/lib/plans.ts`. Monthly prices follow Easymix (Pro €34.9
 - Not yet built: Stripe checkout and webhooks.
 
 ## Work log
+
+- 2026-11-03: Launch-week list from the owner (1 phone journey test in EN/FR incl. payment, 2 signup form higher on mobile, 3 share-link image, 4 pricing: cheap entry plan + lifetime deal for the first 100 + euro prices for French visitors, 5 real before/after demo like easymix's Mixage/Mastering player, 6 free marketing research). Done: (2) the sign-up/login form now comes right after the title on screens under 900 px, with the step cards below it and Clerk's repeated header hidden; the Continue button ends at 535 px on a 360x640 phone (was below the first screen); desktop unchanged. (3) 1200x630 share image (`app/opengraph-image.jpg`, `twitter-image.jpg`, 76 KB) with `metadataBase` from `NEXT_PUBLIC_SITE_URL` or Vercel's production URL; verified live (absolute og:image, 200 image/jpeg, also with a WhatsApp user agent). (6) Research saved in [marketingPlan.md](marketingPlan.md). Payments: the owner is in Rwanda with no company; recommended Polar.sh as merchant of record (Rwanda is on its payout list; needs a Rwandan bank account in RWF), Paddle as backup; Stripe is not used. Waiting on the owner: a Polar sandbox access token in `credentials.md` (blocks payment testing in 1 and checkout for 4), connecting the Creative Claw connector to generate an AI demo song (owner won't record a vocal; the site will label it AI-generated) for 5. Local dev note: Turbopack served stale CSS after edits several times; clearing `web/.next` and restarting fixed it.
 
 - 2026-11-02: Live end-to-end test passed on https://fast-mix-ecru.vercel.app (owner signed in; session "Live test 3"): beat and vocal uploaded straight to R2 (6.6 s and 6.5 s), autotune ran, RoEx recombine stalled again and the preview switched to the multitrack mixer after 5 minutes, finishing about 6 minutes after the request. The preview loaded and played from R2 in the browser (61.1 s, no media error) and downloaded as a 48 kHz 24-bit WAV measuring -9.9 LUFS integrated and -1.3 dBTP. An earlier run reported a timeout only because the test script looked for a "Play" button instead of "Load the preview".
 
