@@ -41,9 +41,11 @@ function TermsEn() {
       <h2 id="plans">4. Plans, billing and renewal</h2>
       <ul>
         <li><b>Starter</b> is free and includes 30-second previews. We may apply fair-use limits to prevent abuse.</li>
-        <li><b>Monthly and yearly plans</b> are billed in advance in US dollars and <b>renew automatically</b> at the end of each month or year, at the price shown at checkout, until you cancel. Payments are processed by Stripe, and by subscribing you authorize recurring charges to your payment method. We email a reminder before a yearly plan renews.</li>
+        <li><b>Our order process is conducted by our online reseller Paddle.com.</b> Paddle.com is the Merchant of Record for all our orders: it processes your payment, issues your invoice and handles customer service enquiries about billing and returns. Its <a href="https://www.paddle.com/legal/checkout-buyer-terms" target="_blank" rel="noopener noreferrer">buyer terms</a> also apply to your purchase.</li>
+        <li><b>Monthly and yearly plans</b> are billed in advance in US dollars (in euros in euro-area countries) and <b>renew automatically</b> at the end of each month or year, at the price shown at checkout, until you cancel. By subscribing you authorize recurring charges to your payment method. We email a reminder before a yearly plan renews.</li>
+        <li>The <b>Lifetime</b> plan is a single payment, offered to the first 100 buyers only. It includes the monthly allowance shown at purchase for as long as {product} operates, with no renewal charges.</li>
         <li>Each plan includes a number of <b>full-length tracks</b> per calendar month, shown on the <Link href="/pricing">pricing page</Link>. Each new full-length mix or master counts as one track; previews and re-downloading a version you already rendered do not. Unused tracks don&apos;t roll over.</li>
-        <li>Prices exclude any sales tax that applies where you live, which is added at checkout.</li>
+        <li>Prices include any sales tax or VAT that applies where you live; checkout shows the tax included.</li>
         <li>We may change prices. We will tell you at least 30 days before a new price applies to your subscription, and it will apply from your next renewal.</li>
       </ul>
 
@@ -126,9 +128,11 @@ function TermsFr() {
       <h2 id="plans">4. Forfaits, facturation et renouvellement</h2>
       <ul>
         <li><b>Starter</b> est gratuit et comprend des aperçus de 30 secondes. Nous pouvons appliquer des limites d’usage raisonnable pour prévenir les abus.</li>
-        <li><b>Les forfaits mensuels et annuels</b> sont facturés d’avance en dollars américains et <b>se renouvellent automatiquement</b> à la fin de chaque mois ou de chaque année, au prix affiché lors du paiement, jusqu’à ce que vous les résiliiez. Les paiements sont traités par Stripe et, en vous abonnant, vous autorisez des prélèvements récurrents sur votre moyen de paiement. Nous vous envoyons un rappel par e-mail avant le renouvellement d’un forfait annuel.</li>
+        <li><b>Nos commandes sont traitées par notre revendeur en ligne Paddle.com.</b> Paddle.com est le vendeur officiel (Merchant of Record) de toutes nos commandes : il traite votre paiement, émet votre facture et répond aux demandes concernant la facturation et les remboursements. Ses <a href="https://www.paddle.com/legal/checkout-buyer-terms" target="_blank" rel="noopener noreferrer">conditions acheteur</a> s’appliquent également à votre achat.</li>
+        <li><b>Les forfaits mensuels et annuels</b> sont facturés d’avance en dollars américains (en euros dans les pays de la zone euro) et <b>se renouvellent automatiquement</b> à la fin de chaque mois ou de chaque année, au prix affiché lors du paiement, jusqu’à ce que vous les résiliiez. En vous abonnant, vous autorisez des prélèvements récurrents sur votre moyen de paiement. Nous vous envoyons un rappel par e-mail avant le renouvellement d’un forfait annuel.</li>
+        <li>Le forfait <b>À vie</b> est un paiement unique, proposé aux 100 premiers acheteurs uniquement. Il comprend le quota mensuel indiqué lors de l’achat aussi longtemps que {product} est en service, sans frais de renouvellement.</li>
         <li>Chaque forfait comprend un nombre de <b>titres complets</b> par mois civil, indiqué sur la <Link href="/pricing">page des tarifs</Link>. Chaque nouveau mix ou master complet compte pour un titre ; les aperçus et le nouveau téléchargement d’une version déjà générée ne comptent pas. Les titres non utilisés ne sont pas reportés.</li>
-        <li>Les prix n’incluent pas les éventuelles taxes sur les ventes applicables dans votre lieu de résidence, qui sont ajoutées lors du paiement.</li>
+        <li>Les prix incluent les éventuelles taxes sur les ventes ou la TVA applicables dans votre lieu de résidence ; le montant de la taxe est indiqué lors du paiement.</li>
         <li>Nous pouvons modifier nos prix. Nous vous préviendrons au moins 30 jours avant qu’un nouveau prix s’applique à votre abonnement, et il s’appliquera à partir de votre prochain renouvellement.</li>
       </ul>
 

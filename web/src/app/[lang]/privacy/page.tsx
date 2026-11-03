@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 const providers = [
   ["Clerk", "Sign-in, passwords and email verification", "Account details, sign-in method, IP address and device information"],
   ["RoEx", "AI mixing and mastering", "The audio files and settings for the mix or master you request"],
-  ["Stripe", "Payments (when paid plans are enabled)", "Billing details and card information, which we never see"],
+  ["Paddle", "Payments, invoices and sales tax, as our reseller and Merchant of Record", "Billing details and card information, which we never see"],
   ["Hosting and storage providers", "Running the website, database and private file storage", "All data described on this page"],
 ];
 
@@ -32,7 +32,7 @@ function PrivacyEn() {
         <li><b>Your directions:</b> the sound descriptions and refinement notes you write, and the settings chosen from them.</li>
         <li><b>Usage:</b> sessions, versions, processing status and errors, and the number of tracks used on your plan.</li>
         <li><b>Device and network:</b> IP address, browser type and the cookies described in our <Link href="/cookies">Cookie policy</Link>.</li>
-        <li><b>Billing:</b> your plan, invoices and payment status. Card numbers go directly to Stripe.</li>
+        <li><b>Billing:</b> your plan, invoices and payment status. Card numbers go directly to Paddle.</li>
         <li><b>Support:</b> messages you send us.</li>
       </ul>
       <p>We don&apos;t collect sensitive data such as government IDs, and we don&apos;t use advertising trackers.</p>
@@ -90,7 +90,7 @@ function PrivacyEn() {
 const providersFr = [
   ["Clerk", "Connexion, mots de passe et vérification de l’adresse e-mail", "Données de compte, mode de connexion, adresse IP et informations sur l’appareil"],
   ["RoEx", "Mixage et mastering par IA", "Les fichiers audio et les réglages du mix ou du master que vous demandez"],
-  ["Stripe", "Paiements (lorsque les forfaits payants sont activés)", "Coordonnées de facturation et informations de carte bancaire, que nous ne voyons jamais"],
+  ["Paddle", "Paiements, factures et taxes, en tant que revendeur et vendeur officiel (Merchant of Record)", "Coordonnées de facturation et informations de carte bancaire, que nous ne voyons jamais"],
   ["Prestataires d’hébergement et de stockage", "Fonctionnement du site, de la base de données et du stockage privé des fichiers", "Toutes les données décrites sur cette page"],
 ];
 
@@ -105,7 +105,7 @@ function PrivacyFr() {
         <li><b>Vos indications :</b> les descriptions de son et les notes que vous rédigez pour affiner un résultat, ainsi que les réglages choisis à partir de celles-ci.</li>
         <li><b>Utilisation :</b> les sessions, les versions, l’état des traitements et les erreurs, ainsi que le nombre de titres utilisés dans le cadre de votre forfait.</li>
         <li><b>Appareil et réseau :</b> l’adresse IP, le type de navigateur et les cookies décrits dans notre <Link href="/cookies">Politique relative aux cookies</Link>.</li>
-        <li><b>Facturation :</b> votre forfait, vos factures et l’état de vos paiements. Les numéros de carte sont transmis directement à Stripe.</li>
+        <li><b>Facturation :</b> votre forfait, vos factures et l’état de vos paiements. Les numéros de carte sont transmis directement à Paddle.</li>
         <li><b>Assistance :</b> les messages que vous nous envoyez.</li>
       </ul>
       <p>Nous ne collectons pas de données sensibles, comme des pièces d’identité officielles, et nous n’utilisons pas de traceurs publicitaires.</p>
