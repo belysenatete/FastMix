@@ -33,6 +33,15 @@ function loadPaddle(environment: "sandbox" | "production") {
   return paddle;
 }
 
+/**
+ * Paddle's emailed payment links (and the account's default payment link) point at the pricing page with
+ * ?_ptxn=…; Paddle.js opens that checkout by itself once it is initialized on the page.
+ */
+export function openPaymentLinkIfPresent() {
+  if (!new URLSearchParams(window.location.search).has("_ptxn")) return;
+  void loadPaddle(process.env.NEXT_PUBLIC_PADDLE_ENV === "production" ? "production" : "sandbox");
+}
+
 type CheckoutResponse = { error?: string; changed?: boolean; environment?: "sandbox" | "production"; priceId?: string; email?: string; customData?: Record<string, unknown> };
 
 /** Opens Paddle checkout for a plan, switches an existing subscription, or sends a signed-out visitor to sign up first. */

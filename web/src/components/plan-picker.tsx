@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { takePendingCheckout, useCheckout } from "@/components/checkout";
+import { openPaymentLinkIfPresent, takePendingCheckout, useCheckout } from "@/components/checkout";
 import { useCountry, useLocale } from "@/components/locale-provider";
 import { Billing, currencyFor, formatPrice, freePlan, lifetimeOffer, monthlyEquivalent, plans, tracksLabel } from "@/lib/plans";
 
@@ -39,6 +39,7 @@ export default function PlanPicker({ inStudio = false, onChanged }: { inStudio?:
   const { start, changed } = checkout;
 
   useEffect(() => {
+    openPaymentLinkIfPresent();
     let mounted = true;
     fetch("/api/billing/lifetime").then((r) => r.json()).then((body) => { if (mounted && typeof body.left === "number") setLifetimeLeft(body.left); }).catch(() => {});
     return () => { mounted = false; };
