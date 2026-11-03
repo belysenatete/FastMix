@@ -359,9 +359,9 @@ export default function MixerWorkspace() {
   const wordCount = useMemo(() => project?.prompt.length || 0, [project?.prompt]);
   const untitled = t.untitled;
 
-  /** The message to show for a failed API call: worker details as sent, known Next.js API errors in the page language. */
+  /** The message to show for a failed API call, in the page language when it is a known message (see lib/studio-messages.ts). */
   const apiError = (body: { detail?: unknown; error?: string }, fallback: string) =>
-    (typeof body.detail === "string" && body.detail) || (body.error && serverMessage(body.error, locale)) || fallback;
+    (typeof body.detail === "string" && serverMessage(body.detail, locale)) || (body.error && serverMessage(body.error, locale)) || fallback;
 
   // Refresh the plan allowance whenever a version starts or finishes.
   useEffect(() => {

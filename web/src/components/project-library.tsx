@@ -174,7 +174,7 @@ export default function ProjectLibrary() {
   async function getOutputUrl(projectId: string, jobId: string, inline: boolean) {
     const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/jobs/${encodeURIComponent(jobId)}/download${inline ? "?inline=1" : ""}`);
     const body = await response.json().catch(() => ({})) as { url?: string; detail?: string; error?: string };
-    if (!response.ok || !body.url) throw new Error(body.detail || (body.error && serverMessage(body.error, locale)) || t.outputUnavailable);
+    if (!response.ok || !body.url) throw new Error((typeof body.detail === "string" && serverMessage(body.detail, locale)) || (body.error && serverMessage(body.error, locale)) || t.outputUnavailable);
     return body.url;
   }
 

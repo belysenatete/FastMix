@@ -222,7 +222,7 @@ export default function AccountHub({ email }: { email: string }) {
     try {
       const response = await fetch("/api/account", { method: "DELETE" });
       const body = await response.json().catch(() => ({})) as { detail?: string; error?: string };
-      if (!response.ok) throw new Error(body.detail || (body.error && serverMessage(body.error, locale)) || t.deleteFailed);
+      if (!response.ok) throw new Error((typeof body.detail === "string" && serverMessage(body.detail, locale)) || (body.error && serverMessage(body.error, locale)) || t.deleteFailed);
       // Drop the cached session list and profile kept in this browser.
       try { Object.keys(localStorage).filter((key) => key.startsWith("fastmix.")).forEach((key) => localStorage.removeItem(key)); } catch { /* storage unavailable */ }
       await clerk.signOut({ redirectUrl: "/" }).catch(() => router.replace("/"));
