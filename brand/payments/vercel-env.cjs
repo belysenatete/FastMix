@@ -10,11 +10,14 @@ const vars = [
   ["NEXT_PUBLIC_PADDLE_CLIENT_TOKEN", read("PADDLE_CLIENT_TOKEN"), false],
   ["NEXT_PUBLIC_PADDLE_ENV", process.argv[2] || "sandbox", false],
 ];
-for (const [name, value, sensitive] of vars) {
+// Optional names after the environment limit the run, e.g. `node vercel-env.cjs sandbox NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`.
+const only = process.argv.slice(3);
+for (const [name, value, sensitive] of vars.filter(([name]) => !only.length || only.includes(name))) {
   if (!value) { console.log(`${name}: missing in credentials.md, skipped`); continue; }
   for (const target of ["production", "preview"]) {
     spawnSync("npx", ["vercel", "env", "rm", name, target, "--yes"], { shell: true, stdio: "ignore" });
-    const args = ["vercel", "env", "add", name, target, ...(sensitive ? ["--sensitive"] : [])];
+    // --no-sensitive/--yes: without them the CLI asks whether a public "*TOKEN*" value should be secret, and fails with no terminal.
+    const args = ["vercel", "env", "add", name, target, sensitive ? "--sensitive" : "--no-sensitive", "--yes"];
     const result = spawnSync("npx", args, { input: value, shell: true, encoding: "utf8" });
     const ok = result.status === 0;
     console.log(`${name} (${target}): ${ok ? "set" : "FAILED " + (result.stderr || "").split("\n").filter((l) => /Error/i.test(l)).join(" ").replaceAll(value, "<hidden>")}`);
