@@ -8,12 +8,12 @@ const copy = {
   en: {
     billing: "Billing", monthly: "Monthly", yearly: "Yearly · 2 months free", perMonth: "/mo", perYear: "/yr", billedYearly: (amount: string) => `${amount}/mo, billed yearly`, free: "Free", forever: "forever",
     popular: "Popular", noFull: "Full-length downloads on Pro and Artist", start: "Start free", choose: "Start now",
-    note: "Prices in US dollars. Each new full-length version counts as one track; re-downloading a version is free. Unused tracks don't roll over. Checkout opens at launch; until then every account is on Starter.",
+    note: "Each new full-length version counts as one track; re-downloading a version is free. Unused tracks don't roll over. Checkout opens at launch; until then every account is on Starter.",
   },
   fr: {
     billing: "Facturation", monthly: "Mensuel", yearly: "Annuel · 2 mois offerts", perMonth: "/mois", perYear: "/an", billedYearly: (amount: string) => `soit ${amount}/mois, facturé à l'année`, free: "Gratuit", forever: "pour toujours",
     popular: "Populaire", noFull: "Titres complets avec Pro et Artist", start: "Commencer gratuitement", choose: "Commencer",
-    note: "Prix en dollars américains. Chaque nouvelle version complète compte pour un titre ; retélécharger une version est gratuit. Les titres non utilisés ne sont pas reportés. Le paiement ouvre au lancement ; d'ici là, tous les comptes sont en Découverte.",
+    note: "Chaque nouvelle version complète compte pour un titre ; retélécharger une version est gratuit. Les titres non utilisés ne sont pas reportés. Le paiement ouvre au lancement ; d'ici là, tous les comptes sont en Découverte.",
   },
 };
 

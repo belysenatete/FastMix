@@ -28,8 +28,8 @@ const copy = {
     before: "Before", after: "After", play: "Play", pause: "Pause",
     demoTabs: { mix: "Mixing", master: "Mastering" },
     listenNotes: {
-      mix: "Demo song made with AI. Before: the lead vocal on its own, separated from the song and only turned up in volume. After: that vocal and the instrumental through FastMix's AI mix.",
-      master: "Demo song made with AI. Before: the unmastered mix, unchanged. After: the same 29 seconds through FastMix's AI mastering. The extra loudness is part of mastering, so the two are not level-matched.",
+      mix: "Before: the lead vocal on its own, separated from the song and only turned up in volume. After: that vocal and the instrumental through FastMix's AI mix.",
+      master: "Before: the unmastered mix, unchanged. After: the same 29 seconds through FastMix's AI mastering. The extra loudness is part of mastering, so the two are not level-matched.",
     },
     askLabel: "What you can ask for",
     askTitle: "Say it your way. FastMix turns it into settings.",
@@ -72,8 +72,8 @@ const copy = {
     before: "Avant", after: "Après", play: "Lecture", pause: "Pause",
     demoTabs: { mix: "Mixage", master: "Mastering" },
     listenNotes: {
-      mix: "Morceau de démo créé avec l'IA. Avant : la voix lead seule, séparée du morceau et simplement montée en volume. Après : cette voix et l'instrumental passés dans le mixage IA de FastMix.",
-      master: "Morceau de démo créé avec l'IA. Avant : le mix non masterisé, tel quel. Après : les mêmes 29 secondes passées dans le mastering IA de FastMix. Le gain de volume fait partie du mastering : les deux versions n'ont donc pas le même niveau.",
+      mix: "Avant : la voix lead seule, séparée du morceau et simplement montée en volume. Après : cette voix et l'instrumental passés dans le mixage IA de FastMix.",
+      master: "Avant : le mix non masterisé, tel quel. Après : les mêmes 29 secondes passées dans le mastering IA de FastMix. Le gain de volume fait partie du mastering : les deux versions n'ont donc pas le même niveau.",
     },
     askLabel: "Ce que vous pouvez demander",
     askTitle: "Dites-le à votre façon. FastMix le traduit en réglages.",
