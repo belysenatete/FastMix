@@ -33,7 +33,7 @@ const french: Record<string, string> = {
   "This track is only available as MP3": "Ce titre n'est disponible qu'en MP3.",
   "No completed output is available": "Aucun résultat terminé n'est disponible.",
   "The MP3 is still being prepared. Try again in a minute.": "Le MP3 est encore en préparation. Réessayez dans une minute.",
-  "Full-length tracks come with the Pro and Artist plans. Previews stay free.": "Les titres complets sont inclus dans les forfaits Pro et Artist. Les aperçus restent gratuits.",
+  "Full-length tracks come with a paid plan. Previews stay free.": "Les titres complets sont inclus dans les forfaits payants. Les aperçus restent gratuits.",
   "Project not found": "Projet introuvable.",
   "Wait for the session job to finish before deleting this project": "Attendez la fin du traitement avant de supprimer ce projet.",
   "Project audio could not be fully removed. Please retry.": "L'audio du projet n'a pas pu être entièrement supprimé. Veuillez réessayer.",

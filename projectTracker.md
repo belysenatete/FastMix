@@ -37,7 +37,11 @@ Plans live in `web/src/lib/plans.ts`. Monthly prices follow Easymix (Pro €34.9
 - Yearly (same tracks per month, priced as ten months): Pro $349/yr → worst case $10.42 Stripe + $36 hosting + $180 RoEx → $122.58 margin (35%), $158.58 (45%) on the large pack. Artist $499/yr → $14.77 + $36 + $300 → $148.23 (30%), $208.23 (42%) on the large pack. Lower worst-case margin than monthly, paid for by cash up front and lower churn.
 - Each new full-length version counts as a track; re-downloads and previews don't. Unused tracks don't roll over.
 - Enforcement (2026-10-27): `worker/app/plans.py` + `usage_events` ledger. Full tracks are counted per calendar month (UTC) and previews have a fair-use cap (`FASTMIX_PREVIEWS_PER_DAY`, default 40 per 24 h). Failed jobs give their usage back; retries claim again; deleting a session does not. Plans come from the newest active `subscriptions` row, otherwise `FASTMIX_DEFAULT_PLAN` (Starter in production; Compose sets Artist for local testing). Stripe will only need to write `subscriptions` rows.
-- Not yet built: Stripe checkout and webhooks.
+- 2026-11-03: payments move to Paddle (merchant of record: it collects and remits VAT/sales tax, and pays out to Payoneer). Paddle fee 5% + $0.50 replaces the Stripe figures above. Prices are tax-inclusive everywhere (what the page shows is what the buyer pays), so in VAT countries FastMix nets less (e.g. France 20%: €34.99 → €29.16 before fees). Visitors in euro countries pay the same numbers in EUR (Paddle price overrides).
+- Lite $14.99/mo or $149/yr, 2 tracks, MP3: worst case $1.25 Paddle + $3 hosting + $5 RoEx → $5.74 margin (38%).
+- Lifetime $249 once, 4 tracks/month, MP3 + WAV, first 100 buyers only (decided 2026-11-03, replacing the earlier "yearly instead of lifetime" call): $12.95 Paddle fee; worst-case running cost $13/month ($10 RoEx + $3 hosting), so a buyer who uses every track costs more than they paid after about 18 months. The cap of 100 bounds that risk; revisit if usage is high.
+- Paddle sandbox catalogue created by `brand/payments/paddle-catalog.cjs`; price IDs live in `web/src/lib/paddle.ts`.
+- Not yet built: Paddle checkout and webhooks.
 
 ## Work log
 

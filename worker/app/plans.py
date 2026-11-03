@@ -9,8 +9,11 @@ from fastapi import HTTPException
 
 PLANS = {
     "starter": {"name": "Starter", "full_tracks": 0, "formats": ()},
+    "lite": {"name": "Lite", "full_tracks": 2, "formats": ("mp3",)},
     "pro": {"name": "Pro", "full_tracks": 6, "formats": ("mp3",)},
     "artist": {"name": "Artist", "full_tracks": 10, "formats": ("mp3", "wav")},
+    # One payment, no renewal: sold to the first 100 buyers only (see web/src/lib/plans.ts lifetimeOffer).
+    "lifetime": {"name": "Lifetime", "full_tracks": 4, "formats": ("mp3", "wav")},
 }
 ACTIVE_SUBSCRIPTION = ("active", "trialing", "past_due")
 
@@ -80,7 +83,7 @@ def claim_full_track(connection, user_id: uuid.UUID, job_id: uuid.UUID):
     _lock_user(connection, user_id)
     plan = PLANS[plan_for(connection, user_id)]
     if plan["full_tracks"] == 0:
-        raise HTTPException(status_code=402, detail="Full-length tracks come with the Pro and Artist plans. Previews stay free.")
+        raise HTTPException(status_code=402, detail="Full-length tracks come with a paid plan. Previews stay free.")
     if full_tracks_used(connection, user_id) >= plan["full_tracks"]:
         raise HTTPException(status_code=402, detail=f"You've used all {plan['full_tracks']} full-length tracks on your {plan['name']} plan this month. They reset on the 1st.")
     connection.execute("INSERT INTO usage_events (user_id, job_id, kind) VALUES (%s, %s, 'full_track') ON CONFLICT DO NOTHING", (user_id, job_id))

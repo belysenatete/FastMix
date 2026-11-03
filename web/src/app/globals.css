@@ -164,6 +164,15 @@ button { cursor: pointer; }
 .tag-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .tag-list li { padding: 6px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); font-size: 14px; }
 .plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 320px)); gap: 16px; margin-top: 20px; }
+.plan-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.plan.plan-lifetime { margin-top: 16px; display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 28px; align-items: center; border-color: var(--brass); background: linear-gradient(120deg, var(--panel), var(--raised)); }
+.plan-lifetime .label { margin: 0 0 6px; }
+.plan-lifetime-title { font-family: var(--font-display); font-size: 24px; font-weight: 600; margin: 6px 0 12px; }
+.plan-lifetime .plan-sub { margin: 0; }
+.plan-lifetime ul { margin: 0; }
+.plan-lifetime-buy { display: grid; gap: 10px; justify-items: start; }
+.plan-lifetime-buy .plan-price { margin: 0; }
+.plan-lifetime-left { margin: 0; font-size: 13px; color: var(--brass); }
 .plan { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-panel); padding: 24px; display: flex; flex-direction: column; }
 .plan-featured { border-color: var(--brass); }
 .plan h3 { font-size: 16px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -373,6 +382,9 @@ textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
 
 /* Responsive */
 @media (max-width: 900px) {
+  .plan-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plan.plan-lifetime { grid-template-columns: 1fr 1fr; }
+  .plan-lifetime-buy { grid-column: 1 / -1; }
   .hero-grid { grid-template-columns: 1fr; gap: 36px; }
   .session-sheet { max-width: 520px; }
   .sheet-settings { grid-template-columns: repeat(2, 1fr); }
@@ -394,7 +406,7 @@ textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
   .section { padding-block: 56px; }
   .hero { padding-block: 36px 56px; }
   .lede { font-size: 16px; }
-  .steps, .card-grid, .card-grid-3, .ask-grid, .plan-grid { grid-template-columns: 1fr; }
+  .steps, .card-grid, .card-grid-3, .ask-grid, .plan-grid, .plan-grid-4, .plan.plan-lifetime { grid-template-columns: 1fr; }
   .ab-player { grid-template-columns: auto 1fr auto; }
   .ab-player .segmented { grid-column: 2 / -1; justify-self: start; }
   .ab-wave { grid-column: 1 / -1; grid-row: 2; height: 44px; }

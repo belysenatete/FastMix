@@ -2,7 +2,7 @@
  * Public plan catalogue, shared by the landing page, the pricing page and the billing screen.
  *
  * Allowances are sized against the RoEx Tonn cost of one paid full-length render
- * (250 credits, $2.50 on the smallest credit pack; previews are free) plus Stripe fees
+ * (250 credits, $2.50 on the smallest credit pack; previews are free) plus Paddle fees
  * and a hosting share, so a plan keeps a margin even when its allowance is fully used.
  * The cost math is recorded in projectTracker.md under "Pricing model"; update both together.
  */
@@ -10,7 +10,7 @@ export type Billing = "monthly" | "yearly";
 type Text = { en: string; fr: string };
 
 export type Plan = {
-  id: "pro" | "artist";
+  id: "lite" | "pro" | "artist";
   name: string;
   popular?: boolean;
   price: Record<Billing, number>;
@@ -28,6 +28,14 @@ const shared: Text[] = [
 ];
 
 export const plans: Plan[] = [
+  {
+    id: "lite",
+    name: "Lite",
+    price: { monthly: 14.99, yearly: 149 },
+    tracks: 2,
+    downloads: { en: "MP3 downloads", fr: "Téléchargement en MP3" },
+    features: shared,
+  },
   {
     id: "pro",
     name: "Pro",
@@ -56,8 +64,29 @@ export const freePlan = {
   ] as Text[],
 };
 
-export function formatPrice(amount: number) {
-  return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(2)}`;
+/** One payment, no renewal, for the first 100 buyers (decided 2026-11-03). Its allowance is the "lifetime" plan in worker/app/plans.py. */
+export const lifetimeOffer = {
+  name: { en: "Lifetime", fr: "À vie" },
+  price: 249,
+  tracks: 4,
+  limit: 100,
+  downloads: { en: "MP3 + WAV downloads", fr: "Téléchargement en MP3 + WAV" },
+};
+
+export type Currency = "USD" | "EUR";
+
+// Visitors in these countries pay in euros, at the same numbers as the dollar prices (decided 2026-11-03).
+// Keep in step with the EUR price overrides in Paddle (brand/payments/paddle-catalog.cjs).
+export const EURO_COUNTRIES = new Set(["AT", "BE", "BG", "HR", "CY", "EE", "FI", "FR", "DE", "GR", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PT", "SK", "SI", "ES", "MC", "AD", "SM", "VA", "GP", "MQ", "GF", "RE", "YT", "PM", "BL", "MF"]);
+
+export function currencyFor(country: string | null | undefined): Currency {
+  return country && EURO_COUNTRIES.has(country.toUpperCase()) ? "EUR" : "USD";
+}
+
+/** "$34.99", "€249" in English; "34,99 €", "249 €" in French. Whole amounts drop the decimals. */
+export function formatPrice(amount: number, currency: Currency = "USD", locale: "en" | "fr" = "en") {
+  const digits = Number.isInteger(amount) ? 0 : 2;
+  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", { style: "currency", currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount);
 }
 
 export function tracksLabel(count: number, locale: "en" | "fr") {

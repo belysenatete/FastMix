@@ -4,9 +4,9 @@ import { useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { switchLocale, useLocale } from "@/components/locale-provider";
+import { switchLocale, useCountry, useLocale } from "@/components/locale-provider";
 import type { Locale } from "@/lib/locale";
-import { formatPrice, plans, tracksLabel } from "@/lib/plans";
+import { currencyFor, formatPrice, plans, tracksLabel } from "@/lib/plans";
 import { serverMessage } from "@/lib/studio-messages";
 import { fetchUsage, planName, resetDate, Usage } from "@/lib/usage";
 
@@ -62,10 +62,10 @@ const copy = {
       title: "Plan & billing", description: "Your plan and what you have used. Checkout opens at launch.",
       current: "Current plan", fullTracks: "Full-length tracks this month",
       resets: (date: string) => `Resets on ${date}.`,
-      noFullTracks: "Previews are free. Full-length tracks come with Pro and Artist.",
+      noFullTracks: "Previews are free. Full-length tracks come with a paid plan.",
       previews: "Previews in the last 24 hours", fairUse: "Previews are free, with a fair-use limit.",
       unavailable: "Your plan and usage appear here once the audio service is running.",
-      paid: "Pro and Artist",
+      paid: "Paid plans",
       from: (price: string) => `From ${price}/mo`,
       planLine: (name: string, tracks: number, monthly: string, yearly: string) => `${name}: ${tracksLabel(tracks, "en")} for ${monthly}/mo or ${yearly}/yr.`,
       checkout: " Checkout opens at launch.",
@@ -141,10 +141,10 @@ const copy = {
       title: "Abonnement et facturation", description: "Votre formule et votre consommation. Le paiement ouvrira au lancement.",
       current: "Formule actuelle", fullTracks: "Titres complets ce mois-ci",
       resets: (date: string) => `Remise à zéro le ${date}.`,
-      noFullTracks: "Les aperçus sont gratuits. Les titres complets sont inclus dans Pro et Artist.",
+      noFullTracks: "Les aperçus sont gratuits. Les titres complets sont inclus dans les forfaits payants.",
       previews: "Aperçus des dernières 24 heures", fairUse: "Les aperçus sont gratuits, dans la limite d'un usage raisonnable.",
       unavailable: "Votre formule et votre consommation s'afficheront ici dès que le service audio sera actif.",
-      paid: "Pro et Artist",
+      paid: "Forfaits payants",
       from: (price: string) => `À partir de ${price}/mois`,
       planLine: (name: string, tracks: number, monthly: string, yearly: string) => `${name} : ${tracksLabel(tracks, "fr")} pour ${monthly}/mois ou ${yearly}/an.`,
       checkout: " Le paiement ouvrira au lancement.",
@@ -187,6 +187,7 @@ function PageHead({ title, description }: { title: string; description: string }
 export default function AccountHub({ email }: { email: string }) {
   const path = usePathname();
   const locale = useLocale();
+  const country = useCountry();
   const t = copy[locale];
   const [notice, setNotice] = useState("");
   const [name, setName] = useState("");
@@ -255,6 +256,7 @@ export default function AccountHub({ email }: { email: string }) {
 
   if (path.endsWith("/billing")) {
     const b = t.billing;
+    const currency = currencyFor(country);
     return <>
       <PageHead title={b.title} description={b.description} />
       {feedback}
@@ -266,7 +268,7 @@ export default function AccountHub({ email }: { email: string }) {
           <UsageMeter label={b.previews} used={usage.previews.used} limit={usage.previews.limit} />
           <p className="hint">{b.fairUse}</p>
         </> : <p>{b.unavailable}</p>}</Card>
-        <Card><h2>{b.paid}</h2><p className="plan-price">{b.from(formatPrice(plans[0].price.monthly))}</p><p>{plans.map((plan) => b.planLine(plan.name, plan.tracks, formatPrice(plan.price.monthly), formatPrice(plan.price.yearly))).join(" ")}{b.checkout}</p><Link className="text-link" href="/pricing">{b.compare}</Link></Card>
+        <Card><h2>{b.paid}</h2><p className="plan-price">{b.from(formatPrice(plans[0].price.monthly, currency, locale))}</p><p>{plans.map((plan) => b.planLine(plan.name, plan.tracks, formatPrice(plan.price.monthly, currency, locale), formatPrice(plan.price.yearly, currency, locale))).join(" ")}{b.checkout}</p><Link className="text-link" href="/pricing">{b.compare}</Link></Card>
         <Card><h2>{b.invoices}</h2><p>{b.noInvoices}</p></Card>
       </div>
     </>;

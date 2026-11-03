@@ -2,6 +2,8 @@
 export const locales = ["en", "fr"] as const;
 export type Locale = (typeof locales)[number];
 export const LOCALE_COOKIE = "fastmix-locale";
+/** Visitor country from Vercel's IP lookup, set by proxy.ts so prerendered pages can show prices in euros. */
+export const COUNTRY_COOKIE = "fastmix-country";
 
 export function isLocale(value: unknown): value is Locale {
   return value === "en" || value === "fr";
