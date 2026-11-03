@@ -1,10 +1,12 @@
 import hmac
+import io
 import mimetypes
 import os
 import uuid
 from pathlib import PurePath
 
 import boto3
+import mutagen
 import psycopg
 from botocore.config import Config
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -18,6 +20,12 @@ UPLOAD_LINK_SECONDS = 900
 MAX_AUDIO_BYTES = 100 * 1024 * 1024
 MAX_PROJECT_TRACKS = 20
 MAX_PROJECT_AUDIO_BYTES = 500 * 1024 * 1024
+# RoEx Tonn's limits (see roex.create_preview): a finished track to master up to 10 minutes, mix tracks up to 8.
+# Checked at upload so a long file is turned down straight away, not after the preview has started.
+MAX_MASTER_SECONDS = 10 * 60
+MAX_MIX_TRACK_SECONDS = 8 * 60
+# Reading a length needs only the file's headers (an MP3's or M4A's can sit further in), so cap what one check downloads.
+DURATION_READ_LIMIT = 8 * 1024 * 1024
 CATEGORIES = {"beat", "lead_vocal", "doubles", "backing_vocals", "adlibs", "instrument", "master"}
 FILE_SIGNATURES = {
     ".wav": lambda data: data.startswith(b"RIFF") and data[8:12] == b"WAVE",
@@ -142,6 +150,76 @@ def track_file(filename: str, category: str) -> tuple[str, str]:
     return original_name, extension
 
 
+class StoredAudio(io.RawIOBase):
+    """A read-only, seekable view of a stored object that fetches only the byte ranges a reader asks for."""
+
+    BLOCK = 256 * 1024
+
+    def __init__(self, client, bucket: str, key: str, size: int):
+        self.client, self.bucket, self.key, self.size = client, bucket, key, size
+        self.position = 0
+        self.blocks: dict[int, bytes] = {}
+        self.fetched = 0
+
+    def readable(self):
+        return True
+
+    def seekable(self):
+        return True
+
+    def tell(self):
+        return self.position
+
+    def seek(self, offset: int, whence: int = io.SEEK_SET):
+        base = {io.SEEK_SET: 0, io.SEEK_CUR: self.position, io.SEEK_END: self.size}[whence]
+        self.position = max(0, base + offset)
+        return self.position
+
+    def _block(self, index: int) -> bytes:
+        if index not in self.blocks:
+            start = index * self.BLOCK
+            end = min(self.size, start + self.BLOCK) - 1
+            if self.fetched + (end - start + 1) > DURATION_READ_LIMIT:
+                raise OSError("duration check read limit reached")
+            self.blocks[index] = self.client.get_object(Bucket=self.bucket, Key=self.key, Range=f"bytes={start}-{end}")["Body"].read()
+            self.fetched += len(self.blocks[index])
+        return self.blocks[index]
+
+    def readinto(self, buffer) -> int:
+        if self.position >= self.size:
+            return 0
+        count = min(len(buffer), self.size - self.position)
+        chunk = b""
+        while len(chunk) < count:
+            block = self._block((self.position + len(chunk)) // self.BLOCK)
+            offset = (self.position + len(chunk)) % self.BLOCK
+            chunk += block[offset:offset + count - len(chunk)]
+        buffer[:count] = chunk
+        self.position += count
+        return count
+
+
+def audio_seconds(fileobj) -> float | None:
+    """Length of an audio file read from its headers, or None when it can't be told (the processor checks again)."""
+    try:
+        audio = mutagen.File(fileobj)
+        length = getattr(getattr(audio, "info", None), "length", None)
+        return float(length) if length and length > 0 else None
+    except Exception:
+        return None
+
+
+def check_length(seconds: float | None, category: str):
+    if seconds is None:
+        return
+    limit = MAX_MASTER_SECONDS if category == "master" else MAX_MIX_TRACK_SECONDS
+    if seconds > limit:
+        length = f"{int(seconds) // 60}:{int(seconds) % 60:02d}"
+        if category == "master":
+            raise HTTPException(status_code=413, detail=f"A finished track to master must be 10 minutes or shorter. This one is {length}.")
+        raise HTTPException(status_code=413, detail=f"Tracks for a mix must be 8 minutes or shorter. This one is {length}.")
+
+
 def check_session_room(connection, project_id: uuid.UUID, size_bytes: int):
     """Lock the session and confirm one more track of this size fits while nothing is processing."""
     connection.execute("SELECT id FROM projects WHERE id = %s FOR UPDATE", (project_id,))
@@ -198,6 +276,7 @@ def complete_upload(project_id: uuid.UUID, body: UploadComplete, user_id: str = 
             signature = client.get_object(Bucket=bucket, Key=storage_key, Range="bytes=0-31")["Body"].read()
             if not FILE_SIGNATURES[extension](signature):
                 raise HTTPException(status_code=415, detail="The file content does not match a supported audio format")
+            check_length(audio_seconds(io.BufferedReader(StoredAudio(client, bucket, storage_key, size_bytes))), body.category)
             check_session_room(connection, project_id, size_bytes)
             mime_type = mimetypes.guess_type(original_name)[0] or UPLOAD_CONTENT_TYPE
             row = connection.execute(

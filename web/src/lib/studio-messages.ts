@@ -64,6 +64,8 @@ const french: Record<string, string> = {
 const frenchPatterns: [RegExp, (...groups: string[]) => string][] = [
   [/^You've made (\d+) previews in the last 24 hours, the fair-use limit\. Try again a little later\.$/, (n) => `Vous avez créé ${n} aperçus en 24 heures, la limite d'usage raisonnable. Réessayez un peu plus tard.`],
   [/^You've used all (\d+) full-length tracks on your (.+) plan this month\. They reset on the 1st\.$/, (n, plan) => `Vous avez utilisé les ${n} titres complets de votre forfait ${plan === "Starter" ? "Découverte" : plan} ce mois-ci. Ils se renouvellent le 1er du mois.`],
+  [/^Tracks for a mix must be 8 minutes or shorter\. This one is (\d+:\d\d)\.$/, (length) => `Les pistes d'un mix doivent durer 8 minutes au maximum. Celle-ci dure ${length}.`],
+  [/^A finished track to master must be 10 minutes or shorter\. This one is (\d+:\d\d)\.$/, (length) => `Un morceau fini à masteriser doit durer 10 minutes au maximum. Celui-ci dure ${length}.`],
   [/^A session can contain at most (\d+) tracks$/, (n) => `Une session peut contenir au maximum ${n} pistes.`],
 ];
 

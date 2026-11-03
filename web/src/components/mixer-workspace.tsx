@@ -76,6 +76,7 @@ const copy = {
     previewFailed: "The preview could not be opened.",
     chooseAudio: "Choose an audio file such as WAV, MP3, FLAC, AIFF, M4A, or OGG.",
     tooLarge: "This preview accepts files up to 100 MB.",
+    tooLong: (length: string, master: boolean) => master ? `A finished track to master must be 10 minutes or shorter. This one is ${length}.` : `Tracks for a mix must be 8 minutes or shorter. This one is ${length}.`,
     uploadingNotice: "Uploading to private audio storage…",
     uploadNotStarted: "The audio upload could not be started.",
     storageFailed: "The audio could not be sent to storage. Please retry.",
@@ -115,8 +116,8 @@ const copy = {
     uploading: "Uploading…",
     addAnother: "Add another track",
     addTrack: "Add a track",
-    hintMaster: "One finished song: WAV, MP3, FLAC, AIFF, M4A or OGG, up to 100 MB.",
-    hintMix: "Give each part its own file: a beat plus your vocal is enough. WAV, MP3, FLAC, AIFF, M4A or OGG, up to 100 MB each.",
+    hintMaster: "One finished song: WAV, MP3, FLAC, AIFF, M4A or OGG, up to 100 MB and 10 minutes.",
+    hintMix: "Give each part its own file: a beat plus your vocal is enough. WAV, MP3, FLAC, AIFF, M4A or OGG, up to 100 MB and 8 minutes each.",
     chooseFile: (category: TrackCategory) => `Choose ${category} audio file`,
     step2: "Describe the sound",
     directionMaster: "Your master direction",
@@ -197,6 +198,7 @@ const copy = {
     previewFailed: "L'aperçu n'a pas pu être ouvert.",
     chooseAudio: "Choisissez un fichier audio, par exemple WAV, MP3, FLAC, AIFF, M4A ou OGG.",
     tooLarge: "Cet aperçu accepte des fichiers jusqu'à 100 Mo.",
+    tooLong: (length: string, master: boolean) => master ? `Un morceau fini à masteriser doit durer 10 minutes au maximum. Celui-ci dure ${length}.` : `Les pistes d'un mix doivent durer 8 minutes au maximum. Celle-ci dure ${length}.`,
     uploadingNotice: "Import vers le stockage audio privé…",
     uploadNotStarted: "L'import audio n'a pas pu démarrer.",
     storageFailed: "L'audio n'a pas pu être envoyé au stockage. Veuillez réessayer.",
@@ -236,8 +238,8 @@ const copy = {
     uploading: "Import en cours…",
     addAnother: "Ajouter une autre piste",
     addTrack: "Ajouter une piste",
-    hintMaster: "Un morceau fini : WAV, MP3, FLAC, AIFF, M4A ou OGG, jusqu'à 100 Mo.",
-    hintMix: "Un fichier par partie : un beat et votre voix suffisent. WAV, MP3, FLAC, AIFF, M4A ou OGG, jusqu'à 100 Mo chacun.",
+    hintMaster: "Un morceau fini : WAV, MP3, FLAC, AIFF, M4A ou OGG, jusqu'à 100 Mo et 10 minutes.",
+    hintMix: "Un fichier par partie : un beat et votre voix suffisent. WAV, MP3, FLAC, AIFF, M4A ou OGG, jusqu'à 100 Mo et 8 minutes chacun.",
     chooseFile: (category: TrackCategory) => `Choisir le fichier audio : ${frCategories[category][0]}`,
     step2: "Décrivez le son",
     directionMaster: "Votre description du master",
@@ -330,6 +332,20 @@ function RefineForm({ disabled, onRefine }: { disabled: boolean; onRefine: (note
     <div className="field-row"><input id="refine-note" value={note} maxLength={500} onChange={(event) => setNote(event.target.value)} placeholder={t.refinePlaceholder} /><button type="submit" className="btn btn-primary" disabled={disabled || !note.trim()}>{t.refineButton}</button></div>
     <p className="hint">{t.refineHint}</p>
   </form>;
+}
+
+/** A local file's length from the browser's own decoder, or null when the browser can't read it (the API checks it too). */
+function audioSeconds(file: File): Promise<number | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const audio = new Audio();
+    const done = (value: number | null) => { clearTimeout(timer); URL.revokeObjectURL(url); audio.removeAttribute("src"); resolve(value); };
+    const timer = setTimeout(() => done(null), 5000);
+    audio.preload = "metadata";
+    audio.onloadedmetadata = () => done(Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : null);
+    audio.onerror = () => done(null);
+    audio.src = url;
+  });
 }
 
 function versionHeading(job: JobItem, projectType: "mix" | "master", t: Copy) {
@@ -530,6 +546,12 @@ export default function MixerWorkspace() {
     const allowed = /\.(wav|mp3|flac|aiff?|m4a|ogg)$/i.test(file.name);
     if (!file.type.startsWith("audio/") && !allowed) { setNotice(t.chooseAudio); return; }
     if (file.size > 100 * 1024 * 1024) { setNotice(t.tooLarge); return; }
+    // Turn a too-long file down before uploading it; the API checks again from the stored file.
+    const seconds = await audioSeconds(file);
+    if (seconds !== null && seconds > (category === "master" ? 10 * 60 : 8 * 60)) {
+      setNotice(t.tooLong(`${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`, category === "master"));
+      return;
+    }
     setUploading(true);
     setNotice(t.uploadingNotice);
     try {
