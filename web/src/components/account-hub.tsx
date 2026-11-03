@@ -4,9 +4,9 @@ import { useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { switchLocale, useCountry, useLocale } from "@/components/locale-provider";
+import { switchLocale, useLocale } from "@/components/locale-provider";
+import PlanPicker from "@/components/plan-picker";
 import type { Locale } from "@/lib/locale";
-import { currencyFor, formatPrice, plans, tracksLabel } from "@/lib/plans";
 import { serverMessage } from "@/lib/studio-messages";
 import { fetchUsage, planName, resetDate, Usage } from "@/lib/usage";
 
@@ -59,18 +59,16 @@ const copy = {
       deleteButton: "Delete my account",
     },
     billing: {
-      title: "Plan & billing", description: "Your plan and what you have used. Checkout opens at launch.",
+      title: "Plan & billing", description: "Your plan, what you have used, and your payments.",
       current: "Current plan", fullTracks: "Full-length tracks this month",
       resets: (date: string) => `Resets on ${date}.`,
       noFullTracks: "Previews are free. Full-length tracks come with a paid plan.",
       previews: "Previews in the last 24 hours", fairUse: "Previews are free, with a fair-use limit.",
       unavailable: "Your plan and usage appear here once the audio service is running.",
-      paid: "Paid plans",
-      from: (price: string) => `From ${price}/mo`,
-      planLine: (name: string, tracks: number, monthly: string, yearly: string) => `${name}: ${tracksLabel(tracks, "en")} for ${monthly}/mo or ${yearly}/yr.`,
-      checkout: " Checkout opens at launch.",
-      compare: "Compare plans →",
-      invoices: "Invoices", noInvoices: "No invoices yet.",
+      choose: "Choose a plan", change: "Change plan",
+      manage: "Manage subscription", manageText: "Update your card, download invoices or cancel. Payments are handled by Paddle, our reseller.",
+      paid: "Payment received. Your plan updates within a minute.",
+      changed: "Your plan was changed. The difference is prorated on your next invoice.",
     },
     affiliate: {
       title: "Affiliate program", description: "Referral tracking isn't active yet. The code below is a sample.",
@@ -138,18 +136,16 @@ const copy = {
       deleteButton: "Supprimer mon compte",
     },
     billing: {
-      title: "Abonnement et facturation", description: "Votre formule et votre consommation. Le paiement ouvrira au lancement.",
+      title: "Abonnement et facturation", description: "Votre formule, votre consommation et vos paiements.",
       current: "Formule actuelle", fullTracks: "Titres complets ce mois-ci",
       resets: (date: string) => `Remise à zéro le ${date}.`,
       noFullTracks: "Les aperçus sont gratuits. Les titres complets sont inclus dans les forfaits payants.",
       previews: "Aperçus des dernières 24 heures", fairUse: "Les aperçus sont gratuits, dans la limite d'un usage raisonnable.",
       unavailable: "Votre formule et votre consommation s'afficheront ici dès que le service audio sera actif.",
-      paid: "Forfaits payants",
-      from: (price: string) => `À partir de ${price}/mois`,
-      planLine: (name: string, tracks: number, monthly: string, yearly: string) => `${name} : ${tracksLabel(tracks, "fr")} pour ${monthly}/mois ou ${yearly}/an.`,
-      checkout: " Le paiement ouvrira au lancement.",
-      compare: "Comparer les formules →",
-      invoices: "Factures", noInvoices: "Aucune facture pour l'instant.",
+      choose: "Choisir un forfait", change: "Changer de forfait",
+      manage: "Gérer mon abonnement", manageText: "Modifiez votre carte, téléchargez vos factures ou résiliez. Les paiements sont gérés par Paddle, notre revendeur.",
+      paid: "Paiement reçu. Votre forfait sera mis à jour d'ici une minute.",
+      changed: "Votre forfait a été modifié. La différence sera calculée au prorata sur votre prochaine facture.",
     },
     affiliate: {
       title: "Programme d'affiliation", description: "Le suivi des parrainages n'est pas encore actif. Le code ci-dessous est un exemple.",
@@ -181,13 +177,35 @@ function UsageMeter({ label, used, limit }: { label: string; used: number; limit
   </div>;
 }
 
+/** Opens Paddle's customer portal (card, invoices, cancellation) in a new tab. */
+function ManageButton({ label, onError }: { label: string; onError: (message: string) => void }) {
+  const locale = useLocale();
+  const [busy, setBusy] = useState(false);
+  async function open() {
+    setBusy(true);
+    // Open the tab now, while the click still counts as a user action, then point it at the portal.
+    const tab = window.open("", "_blank");
+    try {
+      const response = await fetch("/api/billing/portal", { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.url) throw new Error(typeof body.error === "string" ? body.error : "Checkout isn't available yet.");
+      if (tab) tab.location.href = body.url; else window.location.href = body.url;
+    } catch (error) {
+      tab?.close();
+      onError(serverMessage(error instanceof Error ? error.message : "Checkout isn't available yet.", locale));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return <button className="btn btn-secondary" disabled={busy} onClick={() => void open()}>{label}</button>;
+}
+
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) { return <section className={`card ${className}`}>{children}</section>; }
 function PageHead({ title, description }: { title: string; description: string }) { return <div className="page-head"><div><h1>{title}</h1><p>{description}</p></div></div>; }
 
 export default function AccountHub({ email }: { email: string }) {
   const path = usePathname();
   const locale = useLocale();
-  const country = useCountry();
   const t = copy[locale];
   const [notice, setNotice] = useState("");
   const [name, setName] = useState("");
@@ -218,8 +236,20 @@ export default function AccountHub({ email }: { email: string }) {
     if (!path.endsWith("/billing")) return;
     let mounted = true;
     void fetchUsage().then((result) => { if (mounted) setUsage(result); });
-    return () => { mounted = false; };
-  }, [path]);
+    // Back from Paddle checkout: the plan changes when Paddle's webhook arrives, usually within seconds.
+    if (!new URLSearchParams(window.location.search).has("paid")) return () => { mounted = false; };
+    const paidNotice = window.setTimeout(() => setNotice(t.billing.paid), 0);
+    let tries = 0;
+    const poll = window.setInterval(() => {
+      tries += 1;
+      void fetchUsage().then((result) => {
+        if (!mounted || !result) return;
+        setUsage(result);
+        if (result.plan !== "starter" || tries >= 20) window.clearInterval(poll);
+      });
+    }, 3000);
+    return () => { mounted = false; window.clearTimeout(paidNotice); window.clearInterval(poll); };
+  }, [path, t.billing.paid]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -256,7 +286,6 @@ export default function AccountHub({ email }: { email: string }) {
 
   if (path.endsWith("/billing")) {
     const b = t.billing;
-    const currency = currencyFor(country);
     return <>
       <PageHead title={b.title} description={b.description} />
       {feedback}
@@ -268,9 +297,12 @@ export default function AccountHub({ email }: { email: string }) {
           <UsageMeter label={b.previews} used={usage.previews.used} limit={usage.previews.limit} />
           <p className="hint">{b.fairUse}</p>
         </> : <p>{b.unavailable}</p>}</Card>
-        <Card><h2>{b.paid}</h2><p className="plan-price">{b.from(formatPrice(plans[0].price.monthly, currency, locale))}</p><p>{plans.map((plan) => b.planLine(plan.name, plan.tracks, formatPrice(plan.price.monthly, currency, locale), formatPrice(plan.price.yearly, currency, locale))).join(" ")}{b.checkout}</p><Link className="text-link" href="/pricing">{b.compare}</Link></Card>
-        <Card><h2>{b.invoices}</h2><p>{b.noInvoices}</p></Card>
+        {usage && usage.plan !== "starter" && <Card><h2>{b.manage}</h2><p>{b.manageText}</p><ManageButton label={b.manage} onError={setNotice} /></Card>}
       </div>
+      <section className="billing-plans">
+        <h2>{usage && usage.plan !== "starter" ? b.change : b.choose}</h2>
+        <PlanPicker inStudio onChanged={() => { setNotice(b.changed); void fetchUsage().then(setUsage); }} />
+      </section>
     </>;
   }
 

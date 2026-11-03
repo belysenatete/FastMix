@@ -431,3 +431,7 @@ textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
   .menu { width: min(290px, calc(100vw - 72px)); }
   .footer-grid { grid-template-columns: 1fr; }
 }
+
+/* Studio billing page: the plan picker under the usage cards. */
+.billing-plans { margin-top: 32px; }
+.billing-plans h2 { font-size: 22px; margin-bottom: 12px; }

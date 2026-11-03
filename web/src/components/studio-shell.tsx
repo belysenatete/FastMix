@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useClerk } from "@clerk/nextjs";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { hasPendingCheckout } from "@/components/checkout";
 import { useLocale } from "@/components/locale-provider";
 import { Wordmark } from "@/components/site-chrome";
 import { ReactNode, useEffect, useRef, useState } from "react";
@@ -52,6 +53,7 @@ const copy = {
 
 export default function StudioShell({ children, name, email }: { children: ReactNode; name: string; email: string }) {
   const pathname = usePathname();
+  const router = useRouter();
   const clerk = useClerk();
   const t = copy[useLocale()];
   const [menuOpen, setMenuOpen] = useState(false);
@@ -65,6 +67,11 @@ export default function StudioShell({ children, name, email }: { children: React
     window.addEventListener("fastmix-profile", syncProfile);
     return () => window.removeEventListener("fastmix-profile", syncProfile);
   }, [name]);
+
+  // A plan picked before signing up is finished on the billing page (see components/checkout.ts).
+  useEffect(() => {
+    if (!pathname.endsWith("/billing") && hasPendingCheckout()) router.replace("/studio/billing");
+  }, [pathname, router]);
 
   useEffect(() => {
     if (!menuOpen) return;

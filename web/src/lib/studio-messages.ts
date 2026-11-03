@@ -17,6 +17,14 @@ const french: Record<string, string> = {
   "Project not found.": "Projet introuvable.",
   "Sign in to delete projects.": "Connectez-vous pour supprimer vos projets.",
   "Wait for the session job to finish before deleting this project.": "Attendez la fin du traitement avant de supprimer ce projet.",
+  // Billing (src/app/api/billing).
+  "Checkout isn't available yet.": "Le paiement n'est pas encore disponible.",
+  "Sign in to choose a plan.": "Connectez-vous pour choisir un forfait.",
+  "Unknown plan.": "Forfait inconnu.",
+  "You already have lifetime access.": "Vous avez déjà l'accès à vie.",
+  "The lifetime offer is sold out.": "L'offre à vie est épuisée.",
+  "Sign in to manage your plan.": "Connectez-vous pour gérer votre forfait.",
+  "No purchase found for this account.": "Aucun achat trouvé pour ce compte.",
   // From the Python worker (worker/app: jobs.py, plans.py, uploads.py, account.py). Keep in sync with those messages.
   "FastMix couldn't find a change in that note. Try things like \"vocal louder\", \"more reverb\", \"less autotune\", \"harder autotune in A minor\", \"louder\", \"more dynamic\" or a style such as \"make it drill\".": "FastMix n'a trouvé aucun changement dans cette note. Essayez par exemple « voix plus forte », « plus de réverbe », « moins d'autotune », « plus de punch », « plus dynamique » ou un style comme « drill ».",
   "The preview processor is unavailable. Please retry shortly.": "Le traitement des aperçus est indisponible. Réessayez dans un instant.",
