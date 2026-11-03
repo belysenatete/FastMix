@@ -133,13 +133,17 @@ button { cursor: pointer; }
 .sheet-tracks li { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; font-size: 14px; padding: 8px 10px; background: var(--raised); border-radius: var(--radius); }
 .sheet-tracks li span:nth-child(2) { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
 .sheet-tracks li span:last-child { color: var(--muted); font-family: var(--font-mono); font-size: 13px; }
-.session-sheet blockquote { margin: 0; padding: 10px 12px; background: var(--deep); border-left: 3px solid var(--brass); border-radius: var(--radius); font-size: 14px; }
-.sheet-note { font-size: 13px; color: var(--brass); margin: 10px 0 12px; }
-.sheet-status { display: grid; grid-template-columns: auto auto 1fr auto; gap: 10px; align-items: center; font-size: 13px; padding: 10px; background: var(--deep); border-radius: var(--radius); }
-.sheet-status span:last-child { font-family: var(--font-mono); color: var(--brass); }
-.play-dot { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--brass); color: var(--bg); font-size: 10px; padding-left: 2px; }
-.sheet-bar { height: 4px; background: var(--raised); border-radius: 2px; overflow: hidden; }
-.sheet-bar i { display: block; width: 38%; height: 100%; background: var(--brass); }
+.sheet-versions { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.sheet-versions li { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; background: var(--deep); border-radius: var(--radius); font-size: 14px; }
+.sheet-versions li:last-child { border-left: 3px solid var(--brass); }
+.sheet-v { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.sheet-versions li:last-child .sheet-v { color: var(--brass); }
+.sheet-ready { font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: var(--meter-ok); white-space: nowrap; }
+.sheet-label { margin: 16px 0 8px; font-family: var(--font-display); font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.sheet-settings { margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.sheet-settings div { padding: 8px 10px; background: var(--raised); border-radius: var(--radius); min-width: 0; }
+.sheet-settings dt { font-size: 12px; color: var(--muted); }
+.sheet-settings dd { margin: 2px 0 0; font-family: var(--font-mono); font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
 .steps { list-style: none; padding: 0; margin: 30px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .steps li { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-panel); padding: 22px; }
 .steps h3 { font-size: 20px; }
@@ -371,6 +375,7 @@ textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
 @media (max-width: 900px) {
   .hero-grid { grid-template-columns: 1fr; gap: 36px; }
   .session-sheet { max-width: 520px; }
+  .sheet-settings { grid-template-columns: repeat(2, 1fr); }
   .steps, .card-grid-3 { grid-template-columns: 1fr 1fr; }
   .auth-layout { grid-template-columns: 1fr; grid-template-areas: "intro" "form" "points"; grid-template-rows: none; row-gap: 18px; }
   .auth-top { margin-bottom: 20px; }

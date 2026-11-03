@@ -13,8 +13,8 @@ const copy = {
     subtitle: "Upload your beat and your vocal, describe the sound in plain words, and get a mix you can keep refining until it's right.",
     primary: "Start a free session",
     secondary: "Hear an example",
-    facts: ["Free 30-second previews", "MP3 and WAV downloads", "English or French directions"],
-    card: { title: "Summer party", version: "Version 2", beat: "Beat", vocal: "Lead vocal", direction: "Afrobeats party, vocals upfront, light autotune, some reverb", note: "Your note: “vocal louder”", status: "Preview ready" },
+    facts: ["Free 30-second previews", "MP3 and WAV downloads", "Autotune built in"],
+    card: { title: "Summer party", version: "Version 2", beat: "Beat", vocal: "Lead vocal", v1: "Afrobeats party, vocals upfront, light autotune, some reverb", v2: "Vocal a bit louder", status: "Ready", settingsTitle: "What FastMix set", settings: [["Style", "Afrobeats"], ["Vocal", "+2 dB"], ["Autotune", "Light"], ["Reverb", "Some"]] },
     howLabel: "How it works",
     howTitle: "Three steps, no studio jargon.",
     steps: [
@@ -57,8 +57,8 @@ const copy = {
     subtitle: "Importez votre beat et votre voix, décrivez le son avec vos mots, et obtenez un mix que vous pouvez affiner jusqu'à ce qu'il soit parfait.",
     primary: "Commencer gratuitement",
     secondary: "Écouter un exemple",
-    facts: ["Aperçus gratuits de 30 secondes", "Téléchargement en MP3 et WAV", "Consignes en français ou en anglais"],
-    card: { title: "Soirée d'été", version: "Version 2", beat: "Beat", vocal: "Voix lead", direction: "Afrobeats festif, voix devant, autotune léger, un peu de réverbe", note: "Votre note : « voix plus forte »", status: "Aperçu prêt" },
+    facts: ["Aperçus gratuits de 30 secondes", "Téléchargement en MP3 et WAV", "Autotune intégré"],
+    card: { title: "Soirée d'été", version: "Version 2", beat: "Beat", vocal: "Voix lead", v1: "Afrobeats festif, voix devant, autotune léger, un peu de réverbe", v2: "Voix un peu plus forte", status: "Prêt", settingsTitle: "Réglages choisis par FastMix", settings: [["Style", "Afrobeats"], ["Voix", "+2 dB"], ["Autotune", "Léger"], ["Réverbe", "Un peu"]] },
     howLabel: "Comment ça marche",
     howTitle: "Trois étapes, sans jargon de studio.",
     steps: [
@@ -209,9 +209,12 @@ function SessionSheet({ t }: { t: Copy }) {
       <li><span className="chip chip-beat">{t.card.beat}</span><span>beat.wav</span><span>1:56</span></li>
       <li><span className="chip chip-vocal">{t.card.vocal}</span><span>vocal.wav</span><span>1:56</span></li>
     </ul>
-    <blockquote>“{t.card.direction}”</blockquote>
-    <p className="sheet-note">{t.card.note}</p>
-    <div className="sheet-status"><span className="play-dot" aria-hidden="true">▶</span><b>{t.card.status}</b><span className="sheet-bar" aria-hidden="true"><i /></span><span>0:30</span></div>
+    <ol className="sheet-versions">
+      <li><span className="sheet-v">V1</span><span>“{t.card.v1}”</span></li>
+      <li><span className="sheet-v">V2</span><span>“{t.card.v2}”</span><span className="sheet-ready">✓ {t.card.status}</span></li>
+    </ol>
+    <p className="sheet-label">{t.card.settingsTitle}</p>
+    <dl className="sheet-settings">{t.card.settings.map(([name, value]) => <div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl>
   </figure>;
 }
 
