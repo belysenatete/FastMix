@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import PlanPicker from "@/components/plan-picker";
 import { Locale, SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { formatClock, LevelMeter, useAudioLevel } from "@/components/transport";
+import { demoWaveforms } from "@/components/demo-waveforms";
 
 const copy = {
   en: {
@@ -22,10 +23,14 @@ const copy = {
       ["Listen, refine, download", "Start with a free preview, ask for changes in a short note, then download the full track."],
     ],
     listenLabel: "Listen",
-    listenTitle: "Same take. Same beat. A different mix.",
-    listenText: "Switch between the raw tracks and the FastMix version while it plays.",
+    listenTitle: "Hear the difference.",
+    listenText: "Same song, before and after FastMix. Switch while it plays.",
     before: "Before", after: "After", play: "Play", pause: "Pause",
-    listenNote: "Demo made from original synthesized tracks with FastMix's local engine: vocal balance, autotune in A minor, reverb and loudness. Both versions are loudness-matched.",
+    demoTabs: { mix: "Mixing", master: "Mastering" },
+    listenNotes: {
+      mix: "Demo made from original synthesized tracks with FastMix's local engine: vocal balance, autotune in A minor, reverb and loudness. Both versions are loudness-matched.",
+      master: "Demo song made with AI. Before: the unmastered mix, unchanged. After: the same 29 seconds through FastMix's AI mastering. The extra loudness is part of mastering, so the two are not level-matched.",
+    },
     askLabel: "What you can ask for",
     askTitle: "Say it your way. FastMix turns it into settings.",
     stylesTitle: "Styles",
@@ -62,10 +67,14 @@ const copy = {
       ["Écoutez, affinez, téléchargez", "Commencez par un aperçu gratuit, demandez des changements en une phrase, puis téléchargez le morceau complet."],
     ],
     listenLabel: "Écouter",
-    listenTitle: "Même prise. Même beat. Un autre mix.",
-    listenText: "Passez des pistes brutes à la version FastMix pendant la lecture.",
+    listenTitle: "Écoutez la différence.",
+    listenText: "Le même morceau, avant et après FastMix. Changez pendant la lecture.",
     before: "Avant", after: "Après", play: "Lecture", pause: "Pause",
-    listenNote: "Démo créée à partir de pistes synthétisées originales avec le moteur local de FastMix : équilibre de la voix, autotune en la mineur, réverbe et volume. Les deux versions ont le même niveau sonore.",
+    demoTabs: { mix: "Mixage", master: "Mastering" },
+    listenNotes: {
+      mix: "Démo créée à partir de pistes synthétisées originales avec le moteur local de FastMix : équilibre de la voix, autotune en la mineur, réverbe et volume. Les deux versions ont le même niveau sonore.",
+      master: "Morceau de démo créé avec l'IA. Avant : le mix non masterisé, tel quel. Après : les mêmes 29 secondes passées dans le mastering IA de FastMix. Le gain de volume fait partie du mastering : les deux versions n'ont donc pas le même niveau.",
+    },
     askLabel: "Ce que vous pouvez demander",
     askTitle: "Dites-le à votre façon. FastMix le traduit en réglages.",
     stylesTitle: "Styles",
@@ -91,8 +100,31 @@ const copy = {
 
 type Copy = (typeof copy)["en"];
 
-/** A/B player: both versions stay in sync so switching keeps the playback position. */
+type Demo = "mix" | "master";
+
+/** Listen section: Mixing and Mastering demos, each in an A/B player. */
 function BeforeAfter({ t }: { t: Copy }) {
+  // Mastering opens first: it is the demo made from a real song; the mixing one is still synthesized.
+  const [demo, setDemo] = useState<Demo>("master");
+  return <section className="section" id="listen">
+    <div className="container narrow">
+      <p className="label">{t.listenLabel}</p>
+      <h2>{t.listenTitle}</h2>
+      <p className="lede">{t.listenText}</p>
+      <div className="tabs demo-tabs" role="tablist" aria-label={t.listenLabel}>
+        {(["mix", "master"] as const).map((name) => <button key={name} role="tab" id={`demo-tab-${name}`} aria-controls="demo-panel" aria-selected={demo === name} onClick={() => setDemo(name)}>{t.demoTabs[name]}</button>)}
+      </div>
+      <div role="tabpanel" id="demo-panel" aria-labelledby={`demo-tab-${demo}`}>
+        {/* A new player per demo, so switching tabs stops playback and resets the position. */}
+        <ABPlayer key={demo} t={t} demo={demo} />
+        <p className="fine-print">{t.listenNotes[demo]}</p>
+      </div>
+    </div>
+  </section>;
+}
+
+/** A/B player: both versions stay in sync so switching keeps the playback position. */
+function ABPlayer({ t, demo }: { t: Copy; demo: Demo }) {
   const before = useRef<HTMLAudioElement>(null);
   const after = useRef<HTMLAudioElement>(null);
   const [elements, setElements] = useState<{ before: HTMLAudioElement | null; after: HTMLAudioElement | null }>({ before: null, after: null });
@@ -102,8 +134,15 @@ function BeforeAfter({ t }: { t: Copy }) {
   const [duration, setDuration] = useState(0);
   const active = () => (side === "before" ? before : after).current;
   const level = useAudioLevel(elements[side], playing);
+  const bars = demoWaveforms[`${demo}-${side}`];
+  const played = duration ? time / duration : 0;
 
-  useEffect(() => { setElements({ before: before.current, after: after.current }); }, []);
+  useEffect(() => {
+    const pair = { before: before.current, after: after.current };
+    setElements(pair);
+    // A detached element can keep playing, so stop both when this player goes away.
+    return () => { pair.before?.pause(); pair.after?.pause(); };
+  }, []);
 
   useEffect(() => {
     // The browser can load metadata before hydration attaches onDurationChange, so read it once on mount too.
@@ -131,6 +170,14 @@ function BeforeAfter({ t }: { t: Copy }) {
     if (playing) audio.pause(); else void audio.play();
   }
 
+  function seek(event: React.MouseEvent<HTMLDivElement>) {
+    const audio = active();
+    if (!audio || !duration) return;
+    const box = event.currentTarget.getBoundingClientRect();
+    audio.currentTime = Math.min(duration, Math.max(0, ((event.clientX - box.left) / box.width) * duration));
+    setTime(audio.currentTime);
+  }
+
   const events = (name: "before" | "after") => ({
     onPlay: () => { if (name === side) setPlaying(true); },
     onPause: () => { if (name === side) setPlaying(false); },
@@ -139,26 +186,21 @@ function BeforeAfter({ t }: { t: Copy }) {
     onDurationChange: (event: React.SyntheticEvent<HTMLAudioElement>) => { if (name === "before") setDuration(event.currentTarget.duration || 0); },
   });
 
-  return <section className="section" id="listen">
-    <div className="container narrow">
-      <p className="label">{t.listenLabel}</p>
-      <h2>{t.listenTitle}</h2>
-      <p className="lede">{t.listenText}</p>
-      <div className="ab-player">
-        <button className="ab-play" onClick={toggle} aria-label={playing ? t.pause : t.play}>{playing ? "❚❚" : "▶"}</button>
-        <div className="segmented" role="group" aria-label={`${t.before} / ${t.after}`}>
-          <button aria-pressed={side === "before"} onClick={() => choose("before")}>{t.before}</button>
-          <button aria-pressed={side === "after"} onClick={() => choose("after")}>{t.after}</button>
-        </div>
-        <div className="ab-progress" aria-hidden="true"><i style={{ width: `${duration ? (time / duration) * 100 : 0}%` }} /></div>
-        <span className="transport-clock">{formatClock(time)}</span>
-        <LevelMeter level={level} />
-        <audio ref={before} src="/demo/mix-before.mp3" crossOrigin="anonymous" preload="metadata" {...events("before")} />
-        <audio ref={after} src="/demo/mix-after.mp3" crossOrigin="anonymous" preload="metadata" {...events("after")} />
-      </div>
-      <p className="fine-print">{t.listenNote}</p>
+  return <div className="ab-player">
+    <button className="ab-play" onClick={toggle} aria-label={playing ? t.pause : t.play}>{playing ? "❚❚" : "▶"}</button>
+    <div className="segmented" role="group" aria-label={`${t.before} / ${t.after}`}>
+      <button aria-pressed={side === "before"} onClick={() => choose("before")}>{t.before}</button>
+      <button aria-pressed={side === "after"} onClick={() => choose("after")}>{t.after}</button>
     </div>
-  </section>;
+    {/* Bar heights show each version's loudness on one scale, so the louder master draws taller bars. Click to seek. */}
+    <div className={`ab-wave ab-wave-${side}`} aria-hidden="true" onClick={seek}>
+      {bars.map((height, index) => <i key={index} className={index / bars.length < played ? "played" : undefined} style={{ height: `${Math.round(height * 100)}%` }} />)}
+    </div>
+    <span className="transport-clock">{formatClock(time)}</span>
+    <LevelMeter level={level} />
+    <audio ref={before} src={`/demo/${demo}-before.mp3`} crossOrigin="anonymous" preload="metadata" {...events("before")} />
+    <audio ref={after} src={`/demo/${demo}-after.mp3`} crossOrigin="anonymous" preload="metadata" {...events("after")} />
+  </div>;
 }
 
 function SessionSheet({ t }: { t: Copy }) {
