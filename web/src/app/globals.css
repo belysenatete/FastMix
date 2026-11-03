@@ -192,9 +192,10 @@ button { cursor: pointer; }
 /* Auth */
 .auth-page { min-height: 100vh; padding: 24px 0 56px; }
 .auth-top { display: flex; justify-content: space-between; align-items: center; width: min(1100px, calc(100% - 40px)); margin: 0 auto 44px; }
-.auth-layout { width: min(980px, calc(100% - 40px)); margin: 0 auto; display: grid; grid-template-columns: 1fr 420px; gap: 44px; align-items: start; }
-.auth-intro { padding-top: 12px; }
-.auth-points { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 14px; max-width: 440px; }
+.auth-layout { width: min(980px, calc(100% - 40px)); margin: 0 auto; display: grid; grid-template-columns: 1fr 420px; grid-template-areas: "intro form" "points form"; grid-template-rows: auto 1fr; column-gap: 44px; align-items: start; }
+.auth-intro { grid-area: intro; padding-top: 12px; }
+.auth-form { grid-area: form; }
+.auth-points { grid-area: points; list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 14px; max-width: 440px; }
 .auth-points li { display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-panel); }
 .auth-points li > span { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--deep); border: 1px solid var(--line); color: var(--brass); font-family: var(--font-mono); font-size: 13px; }
 .auth-points b { display: block; font-family: var(--font-display); font-size: 17px; font-weight: 600; letter-spacing: .03em; }
@@ -368,7 +369,14 @@ textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
   .hero-grid { grid-template-columns: 1fr; gap: 36px; }
   .session-sheet { max-width: 520px; }
   .steps, .card-grid-3 { grid-template-columns: 1fr 1fr; }
-  .auth-layout { grid-template-columns: 1fr; gap: 22px; }
+  .auth-layout { grid-template-columns: 1fr; grid-template-areas: "intro" "form" "points"; grid-template-rows: none; row-gap: 18px; }
+  .auth-top { margin-bottom: 20px; }
+  .auth-intro { padding-top: 0; }
+  .auth-intro h1 { font-size: 30px; margin-bottom: 6px; }
+  .auth-intro .lede { margin: 0; font-size: 15px; }
+  .auth-points { margin-top: 8px; }
+  /* The page title already says this; dropping Clerk's repeat keeps the button on small phones' first screen. */
+  .clerk-header { display: none !important; }
   .footer-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 720px) {
