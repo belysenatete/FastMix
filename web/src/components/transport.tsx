@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLocale } from "@/components/locale-provider";
 
 const SEGMENTS = 14;
 
@@ -69,6 +70,7 @@ export default function Transport({ src, label, autoPlay = false }: { src: strin
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const level = useAudioLevel(audio, playing);
+  const fr = useLocale() === "fr";
 
   function seek(event: React.MouseEvent<HTMLDivElement>) {
     const element = audioRef.current;
@@ -78,9 +80,9 @@ export default function Transport({ src, label, autoPlay = false }: { src: strin
   }
 
   return <div className="transport" role="group" aria-label={label}>
-    <button className="transport-play" aria-label={playing ? `Pause ${label}` : `Play ${label}`} onClick={() => { const element = audioRef.current; if (!element) return; if (playing) element.pause(); else void element.play(); }}>{playing ? "❚❚" : "▶"}</button>
+    <button className="transport-play" aria-label={fr ? (playing ? `Mettre en pause : ${label}` : `Lire : ${label}`) : playing ? `Pause ${label}` : `Play ${label}`} onClick={() => { const element = audioRef.current; if (!element) return; if (playing) element.pause(); else void element.play(); }}>{playing ? "❚❚" : "▶"}</button>
     <span className="transport-clock">{formatClock(time)}</span>
-    <div className="transport-seek" onClick={seek} role="slider" aria-label={`Position in ${label}`} aria-valuemin={0} aria-valuemax={Math.round(duration)} aria-valuenow={Math.round(time)} tabIndex={0}
+    <div className="transport-seek" onClick={seek} role="slider" aria-label={fr ? `Position dans ${label}` : `Position in ${label}`} aria-valuemin={0} aria-valuemax={Math.round(duration)} aria-valuenow={Math.round(time)} tabIndex={0}
       onKeyDown={(event) => { const element = audioRef.current; if (!element) return; if (event.key === "ArrowRight") element.currentTime = Math.min(duration, element.currentTime + 5); if (event.key === "ArrowLeft") element.currentTime = Math.max(0, element.currentTime - 5); }}>
       <i style={{ width: `${duration ? (time / duration) * 100 : 0}%` }} />
     </div>

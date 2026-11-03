@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import PlanPicker from "@/components/plan-picker";
-import { Locale, SiteFooter, SiteHeader } from "@/components/site-chrome";
+import { useLocale } from "@/components/locale-provider";
+import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { formatClock, LevelMeter, useAudioLevel } from "@/components/transport";
 import { demoWaveforms } from "@/components/demo-waveforms";
 
@@ -219,11 +220,10 @@ function SessionSheet({ t }: { t: Copy }) {
 }
 
 export default function LandingPage() {
-  const [locale, setLocale] = useState<Locale>("en");
-  const t = copy[locale];
+  const t = copy[useLocale()];
 
   return <>
-    <SiteHeader locale={locale} onLocale={setLocale} />
+    <SiteHeader />
     <main>
       <section className="hero">
         <div className="container hero-grid">
@@ -262,7 +262,7 @@ export default function LandingPage() {
         <div className="container">
           <p className="label">{t.pricingLabel}</p>
           <h2>{t.pricingTitle}</h2>
-          <PlanPicker locale={locale} />
+          <PlanPicker />
         </div>
       </section>
 
@@ -279,6 +279,6 @@ export default function LandingPage() {
         <div className="container cta-inner"><h2>{t.ctaTitle}</h2><Link className="btn btn-light btn-large" href="/signup">{t.ctaButton}</Link></div>
       </section>
     </main>
-    <SiteFooter locale={locale} />
+    <SiteFooter />
   </>;
 }

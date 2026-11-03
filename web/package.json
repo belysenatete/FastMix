@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@clerk/localizations": "^4.24.4",
     "@clerk/nextjs": "^7.9.21",
     "next": "^16.4.3",
     "postgres": "^3.4.9",

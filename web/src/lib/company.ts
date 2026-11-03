@@ -5,4 +5,6 @@ export const company = {
   supportEmail: "support@fastmix.example",
   privacyEmail: "privacy@fastmix.example",
   legalUpdated: "October 26, 2026",
+  /** The same date as legalUpdated, written in French. Keep both in sync. */
+  legalUpdatedFr: "26 octobre 2026",
 };

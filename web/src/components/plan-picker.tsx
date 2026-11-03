@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale } from "@/components/locale-provider";
 import Link from "next/link";
 import { useState } from "react";
 import { Billing, formatPrice, freePlan, monthlyEquivalent, plans, tracksLabel } from "@/lib/plans";
@@ -18,7 +19,8 @@ const copy = {
 };
 
 /** Monthly / yearly plan cards, styled after a console channel strip. */
-export default function PlanPicker({ locale = "en" }: { locale?: "en" | "fr" }) {
+export default function PlanPicker() {
+  const locale = useLocale();
   const [billing, setBilling] = useState<Billing>("monthly");
   const t = copy[locale];
   return <>
