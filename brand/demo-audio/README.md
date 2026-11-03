@@ -11,7 +11,12 @@ Files in `web/public/demo`, shown by the Listen section of the homepage.
 
 ## Mixing (`mix-before.mp3`, `mix-after.mp3`)
 
-Original synthesized tracks mixed by FastMix's local engine, loudness-matched. To be replaced by a real beat and vocal.
+- Source: `D:/mixing.wav`, a 36-second demo song the owner made with an AI music generator on a paid plan (commercial use allowed; the song itself ends at 30 s). It's labelled on the site as made with AI.
+- Separation: Demucs 4.0.1 `htdemucs_ft`, `--two-stems=vocals`, run locally in Docker (`python:3.11-slim` + CPU torch 2.1.2 + `demucs==4.0.1`).
+- Before: the first 30 s of the separated vocal, turned up 2.97 dB so it peaks at -1 dBTP (about -17.5 LUFS). No other processing.
+- After: that vocal and the separated instrumental through FastMix's own AI mix, the RoEx Tonn recombine preview (`mix_demo.py`, prompt "clean modern vocal, upfront and clear over the beat" → genre OTHER, loudness MEDIUM, vocal +2 dB, no reverb, no autotune; task rc_40ff57e0-317e-4dec-a7c7-19c998596126). About -11.7 LUFS, -1.2 dBTP.
+- Both: the After's 26 ms of RoEx padding trimmed so they line up, 30 s, 10 ms fade-in and 1.5 s fade-out, 192 kbps stereo MP3. Not loudness-matched: the Before is as loud as it can go without limiting.
+- To redo the separation: `docker build -f demucs.Dockerfile -t fastmix-demucs .`, then `docker run --rm -v "D:/:/in:ro" -v "<out>:/out" fastmix-demucs -n htdemucs_ft --two-stems=vocals -o /out/sep /in/mixing.wav`.
 
 ## Waveforms
 

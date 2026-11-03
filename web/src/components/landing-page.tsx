@@ -28,7 +28,7 @@ const copy = {
     before: "Before", after: "After", play: "Play", pause: "Pause",
     demoTabs: { mix: "Mixing", master: "Mastering" },
     listenNotes: {
-      mix: "Demo made from original synthesized tracks with FastMix's local engine: vocal balance, autotune in A minor, reverb and loudness. Both versions are loudness-matched.",
+      mix: "Demo song made with AI. Before: the lead vocal on its own, separated from the song and only turned up in volume. After: that vocal and the instrumental through FastMix's AI mix.",
       master: "Demo song made with AI. Before: the unmastered mix, unchanged. After: the same 29 seconds through FastMix's AI mastering. The extra loudness is part of mastering, so the two are not level-matched.",
     },
     askLabel: "What you can ask for",
@@ -72,7 +72,7 @@ const copy = {
     before: "Avant", after: "Après", play: "Lecture", pause: "Pause",
     demoTabs: { mix: "Mixage", master: "Mastering" },
     listenNotes: {
-      mix: "Démo créée à partir de pistes synthétisées originales avec le moteur local de FastMix : équilibre de la voix, autotune en la mineur, réverbe et volume. Les deux versions ont le même niveau sonore.",
+      mix: "Morceau de démo créé avec l'IA. Avant : la voix lead seule, séparée du morceau et simplement montée en volume. Après : cette voix et l'instrumental passés dans le mixage IA de FastMix.",
       master: "Morceau de démo créé avec l'IA. Avant : le mix non masterisé, tel quel. Après : les mêmes 29 secondes passées dans le mastering IA de FastMix. Le gain de volume fait partie du mastering : les deux versions n'ont donc pas le même niveau.",
     },
     askLabel: "Ce que vous pouvez demander",
@@ -104,8 +104,7 @@ type Demo = "mix" | "master";
 
 /** Listen section: Mixing and Mastering demos, each in an A/B player. */
 function BeforeAfter({ t }: { t: Copy }) {
-  // Mastering opens first: it is the demo made from a real song; the mixing one is still synthesized.
-  const [demo, setDemo] = useState<Demo>("master");
+  const [demo, setDemo] = useState<Demo>("mix");
   return <section className="section" id="listen">
     <div className="container narrow">
       <p className="label">{t.listenLabel}</p>
